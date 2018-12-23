@@ -55,8 +55,8 @@ cat "$BACKUP_LIST".diff | (
 	echo "BEGIN TRANSACTION;"
 	while read change fullname; do
 		# escape vars for DB
-		clean_name="${fullname//\'/\'\'}"
-		# clean_name="$(echo "$fullname" | sed "s/'/''/g")"
+		clean_fullname="${fullname//\'/\'\'}"
+		# clean_fullname="$(echo "$fullname" | sed "s/'/''/g")"
 		clean_dirname="${clean_fullname%/*}"
 		test "$clean_dirname" = "$clean_fullname" && dirname=""
 		clean_filename="${clean_fullname##*/}"

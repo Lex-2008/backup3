@@ -22,7 +22,6 @@ deleted TEXT,
 freq INTEGER NOT NULL);
 CREATE INDEX history_update ON history (dirname, filename) WHERE freq = 0;"
 
-a=0
 (cd $FROM; ls -d */*/) | sed 's_/_ _' | sort -k 2 | uniq -f 1 | sed 's_ _/_' | while read dir; do
 	# export SRC="$FROM/$dir"
 	rm -rf $BACKUP_CURRENT/flower
@@ -32,7 +31,5 @@ a=0
 	export NOW="$(echo "$dir" | sed 's/_/ /')"
 	echo "processing [$NOW]..."
 	time bash ~/git/backup3/backup.sh || exit 1
-	test "$a" = "1" && break
-	a=1
 done
 
