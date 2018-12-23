@@ -1,4 +1,10 @@
-#!/bin/sh
+#!/bin/bash
+
+# Note: it is bash instead of dash for speed improvements which the following
+# bashism gives us: to replace ' with ", instead of calling external tool like this:
+#	clean_name="$(echo "$fullname" | sed "s/'/''/g")"
+# We can do it natively in bash, like this:
+#	clean_name="${fullname//\'/\'\'}"
 
 ROOT=$PWD/t
 
@@ -45,38 +51,43 @@ last_midnight="$(date -d "$(date -d "$NOW" "+%F")" +"%F %T")"
 first_minute_of_hour="$(date -d "$(date -d "$NOW" "+%F %H:00")" +"%F %T")"
 
 echo "parsing $(cat "$BACKUP_LIST".diff | wc -l) changes to db..."
-cat "$BACKUP_LIST".diff | while read change fullname; do
-	# escape vars for DB
-	clean_name="$(echo "$fullname" | sed "s/'/''/g")"
-	clean_dirname="${clean_fullname%/*}"
-	test "$clean_dirname" = "$clean_fullname" && dirname=""
-	clean_filename="${clean_fullname##*/}"
-	case "$change" in
-		( N ) # New file
-			echo "INSERT INTO history (dirname, filename, created, deleted, freq) VALUES ('$clean_dirname', '$clean_filename', '$NOW', NULL, 0);"
-			dirname="${fullname%/*}"
-			test "$dirname" = "$fullname" && dirname=""
-			newname="$fullname#$NOW"
-			mkdir -p "$BACKUP"/"$dirname"
-			ln "$BACKUP_CURRENT"/"$fullname" "$BACKUP"/"$newname"
-			;;
-		( D ) # Deleted
-			echo "UPDATE history
-				SET
-					deleted = '$NOW',
-					freq = CASE
-						WHEN created < '$first_day_of_month' THEN 1
-						WHEN created < '$last_sunday' THEN 5
-						WHEN created < '$last_midnight' THEN 30
-						WHEN created < '$first_minute_of_hour' THEN 720
-						ELSE 8640
-					END
-				WHERE dirname = '$clean_dirname'
-				AND filename = '$clean_filename'
-				AND freq = 0;"
-			;;
-	esac
-done | $SQLITE
+cat "$BACKUP_LIST".diff | (
+	echo "BEGIN TRANSACTION;"
+	while read change fullname; do
+		# escape vars for DB
+		clean_name="${fullname//\'/\'\'}"
+		# clean_name="$(echo "$fullname" | sed "s/'/''/g")"
+		clean_dirname="${clean_fullname%/*}"
+		test "$clean_dirname" = "$clean_fullname" && dirname=""
+		clean_filename="${clean_fullname##*/}"
+		case "$change" in
+			( N ) # New file
+				echo "INSERT INTO history (dirname, filename, created, deleted, freq) VALUES ('$clean_dirname', '$clean_filename', '$NOW', NULL, 0);"
+				dirname="${fullname%/*}"
+				test "$dirname" = "$fullname" && dirname=""
+				newname="$fullname#$NOW"
+				mkdir -p "$BACKUP"/"$dirname"
+				ln "$BACKUP_CURRENT"/"$fullname" "$BACKUP"/"$newname"
+				;;
+			( D ) # Deleted
+				echo "UPDATE history
+					SET
+						deleted = '$NOW',
+						freq = CASE
+							WHEN created < '$first_day_of_month' THEN 1
+							WHEN created < '$last_sunday' THEN 5
+							WHEN created < '$last_midnight' THEN 30
+							WHEN created < '$first_minute_of_hour' THEN 720
+							ELSE 8640
+						END
+					WHERE dirname = '$clean_dirname'
+					AND filename = '$clean_filename'
+					AND freq = 0;"
+				;;
+		esac
+	done
+	echo "END TRANSACTION;"
+) | $SQLITE
 
 echo 'done!'
 exit 0
