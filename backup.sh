@@ -20,10 +20,38 @@ SQLITE="sqlite3 $SQLITE_DB"
 
 ### RSYNC ###
 # TODO: actually, ALL rsync commands
+# rsync -ai --fake-super --delete --one-file-system --backup --backup-dir="$BACKUP_TMP" $RSYNC_EXTRA "$SRC" "$BACKUP_CURRENT"/"$DST" >"$BACKUP_LOG"
+
+### IMPORT ###
+
+echo 'listing new files...'
 rsync -ain --fake-super --delete --one-file-system "$SRC" "$BACKUP_CURRENT"/"$DST" > "$BACKUP_LOG"
-rsync -a --fake-super --delete --one-file-system --backup --backup-dir="$BACKUP_TMP" $RSYNC_EXTRA "$SRC" "$BACKUP_CURRENT"/"$DST"
+
+echo 'copying all files...'
+(
+	cd "$SRC"
+	IFS="
+"
+	cp -al $(ls -f | fgrep -v -x -e '.' -e '..' ) "$BACKUP_CURRENT"/"$DST" --backup
+)
+
+echo 'detecting backed-up files...'
+rsync -ain --delete "$SRC" "$BACKUP_CURRENT"/"$DST" >deleted_files
+
+echo "moving $(cat "deleted_files" | fgrep "*deleting" | grep -v "/$" | wc -l) backed-up files into BACKUP_TMP..."
+cat deleted_files | while read itemiz fullname; do
+	test "$itemiz" = "*deleting" || continue
+	newname="${fullname%~}"
+	dirname="${newname%/*}"
+	test "$dirname" = "$newname" && dirname=""
+	test -d "$BACKUP_CURRENT"/"$DST"/"$fullname" && continue
+	test -f "$BACKUP_CURRENT"/"$DST"/"$fullname" || echo "file not found: [$BACKUP_CURRENT/$DST/$fullname]"
+	mkdir -p "$BACKUP_TMP"/"$DST"/"$dirname"
+	mv "$BACKUP_CURRENT"/"$DST"/"$fullname" "$BACKUP_TMP"/"$DST"/"$newname"
+done
 
 ### BACKUP ###
+echo 'writing changes to disk...'
 sync
 
 first_day_of_month="$(date -d "$(date -d "$NOW" "+%Y-%m-01")" +"%F %T")"
@@ -38,33 +66,36 @@ add_file()
 	echo "INSERT INTO history (dirname, filename, created, deleted, freq) VALUES ('$1', '$2', '$NOW', NULL, 0);"
 }
 
+echo "adding $(cat "$BACKUP_LOG" | fgrep '>f+++' | wc -l) new files to db..."
+# cat "$BACKUP_LOG" | while read fullname; do
 cat "$BACKUP_LOG" | while read itemiz fullname; do
 	case "$itemiz" in
 		( ">"f+* )
 			# new file
+			# escape var for DB
+			fullname="$(echo "$fullname" | sed "s/'/''/g")"
 			dirname="${fullname%/*}"
 			test "$dirname" = "$fullname" && dirname=""
 			filename="${fullname##*/}"
-			# escape vars for DB
-			dirname="${dirname/\'/\'\\\'\'}"
-			filename="${filename/\'/\'\\\'\'}"
 			add_file "$dirname" "$filename"
 			;;
 	esac
 done | $SQLITE
 
-(cd "$BACKUP_TMP" && find -type f) | while read fullname; do
+echo 'finding changed files...'
+(cd "$BACKUP_TMP" && find -type f) >new_files
+echo "updating $(cat new_files | wc -l) files in db..."
+cat new_files | while read fullname; do
 	fullname="${fullname#./}" # remove leading ./
 	dirname="${fullname%/*}"
 	test "$dirname" = "$fullname" && dirname=""
 	filename="${fullname##*/}"
 	newname="$fullname#$NOW"
 	mkdir -p "$BACKUP"/"$dirname"
-	# echo "del [$dirname][$filename]" >&2
 	mv "$BACKUP_TMP"/"$fullname" "$BACKUP"/"$newname"
 	# escape vars for DB
-	dirname="${dirname/\'/\'\\\'\'}"
-	filename="${filename/\'/\'\\\'\'}"
+	dirname="$(echo "$dirname" | sed "s/'/''/g")"
+	filename="$(echo "$filename" | sed "s/'/''/g")"
 	echo "UPDATE history
 		SET
 			deleted = '$NOW',
@@ -77,11 +108,15 @@ done | $SQLITE
 			END
 		WHERE dirname = '$dirname'
 		AND filename = '$filename'
-		AND deleted IS NULL;" >/dev/null
+		AND freq = 0;"
 	test -f "$BACKUP_CURRENT"/"$fullname" && add_file "$dirname" "$filename"
 done | $SQLITE
 
+echo 'done!'
 exit 0
+
+
+
 
 ### CLEAN UP ###
 

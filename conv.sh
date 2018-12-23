@@ -27,7 +27,6 @@ freq INTEGER NOT NULL);"
 	export NOW="$(date -d "$(echo "$dir" | sed 's/_/ /')" +"%F %T")"
 	echo "processing $NOW..."
 	dash ~/backup3/backup.sh
-	break
 done
 
 
