@@ -5,10 +5,9 @@ ROOT=$PWD/t
 test -z "$SRC"            && SRC=$ROOT/a/
 test -z "$DST"            # this is fine
 test -z "$BACKUP_CURRENT" && BACKUP_CURRENT=$ROOT/b
-test -z "$BACKUP_TMP"     && BACKUP_TMP=$ROOT/c
+test -z "$BACKUP_LIST"    && BACKUP_TMP=$ROOT/files.txt
 test -z "$BACKUP"         && BACKUP=$ROOT/d
 test -z "$BACKUP_LOG"     && BACKUP_LOG=$ROOT/rsync.log
-test -z "$BACKUP_DEV"     && BACKUP_DEV=/dev/sda1
 test -z "$SQLITE_DB"      && SQLITE_DB=backup.db
 
 EXTRA_PERCENT=10
@@ -20,35 +19,21 @@ SQLITE="sqlite3 $SQLITE_DB"
 
 ### RSYNC ###
 # TODO: actually, ALL rsync commands
-# rsync -ai --fake-super --delete --one-file-system --backup --backup-dir="$BACKUP_TMP" $RSYNC_EXTRA "$SRC" "$BACKUP_CURRENT"/"$DST" >"$BACKUP_LOG"
+# rsync -a --fake-super --delete --one-file-system $RSYNC_EXTRA "$SRC" "$BACKUP_CURRENT"/"$DST"
 
-### IMPORT ###
+### DIFF ###
 
-echo 'listing new files...'
-rsync -ain --fake-super --delete --one-file-system "$SRC" "$BACKUP_CURRENT"/"$DST" > "$BACKUP_LOG"
+echo 'listing all files...'
+(find "$BACKUP_CURRENT" -type f -printf '%i %P\n' ) | sort --key 2 >"$BACKUP_LIST".new
 
-echo 'copying all files...'
-(
-	cd "$SRC"
-	IFS="
-"
-	cp -al $(ls -f | fgrep -v -x -e '.' -e '..' ) "$BACKUP_CURRENT"/"$DST" --backup
-)
+echo "found files: $(wc -l "$BACKUP_LIST".new)"
 
-echo 'detecting backed-up files...'
-rsync -ain --delete "$SRC" "$BACKUP_CURRENT"/"$DST" >deleted_files
+echo 'generating diff...'
+diff --new-file "$BACKUP_LIST" "$BACKUP_LIST".new | sed '/^[<>]/!d;s/^\(.\) [0-9]*/\1/;s/^>/N/;s/^</D/' | sort --key=2,1 >"$BACKUP_LIST".diff
 
-echo "moving $(cat "deleted_files" | fgrep "*deleting" | grep -v "/$" | wc -l) backed-up files into BACKUP_TMP..."
-cat deleted_files | while read itemiz fullname; do
-	test "$itemiz" = "*deleting" || continue
-	newname="${fullname%~}"
-	dirname="${newname%/*}"
-	test "$dirname" = "$newname" && dirname=""
-	test -d "$BACKUP_CURRENT"/"$DST"/"$fullname" && continue
-	test -f "$BACKUP_CURRENT"/"$DST"/"$fullname" || echo "file not found: [$BACKUP_CURRENT/$DST/$fullname]"
-	mkdir -p "$BACKUP_TMP"/"$DST"/"$dirname"
-	mv "$BACKUP_CURRENT"/"$DST"/"$fullname" "$BACKUP_TMP"/"$DST"/"$newname"
-done
+echo "found changes: $(wc -l "$BACKUP_LIST".diff)"
+
+mv "$BACKUP_LIST".new "$BACKUP_LIST"
 
 ### BACKUP ###
 echo 'writing changes to disk...'
@@ -59,57 +44,38 @@ last_sunday="$(date -d "$(date -d "-$(date -d "$NOW" +%w) days" +"%Y-%m-%d")" +"
 last_midnight="$(date -d "$(date -d "$NOW" "+%F")" +"%F %T")"
 first_minute_of_hour="$(date -d "$(date -d "$NOW" "+%F %H:00")" +"%F %T")"
 
-# let SQLite know about new file.
-# Args: dirname, filename
-add_file()
-{
-	echo "INSERT INTO history (dirname, filename, created, deleted, freq) VALUES ('$1', '$2', '$NOW', NULL, 0);"
-}
-
-echo "adding $(cat "$BACKUP_LOG" | fgrep '>f+++' | wc -l) new files to db..."
-# cat "$BACKUP_LOG" | while read fullname; do
-cat "$BACKUP_LOG" | while read itemiz fullname; do
-	case "$itemiz" in
-		( ">"f+* )
-			# new file
-			# escape var for DB
-			fullname="$(echo "$fullname" | sed "s/'/''/g")"
+echo "parsing $(cat "$BACKUP_LIST".diff | wc -l) changes to db..."
+cat "$BACKUP_LIST".diff | while read change fullname; do
+	# escape vars for DB
+	clean_name="$(echo "$fullname" | sed "s/'/''/g")"
+	clean_dirname="${clean_fullname%/*}"
+	test "$clean_dirname" = "$clean_fullname" && dirname=""
+	clean_filename="${clean_fullname##*/}"
+	case "$change" in
+		( N ) # New file
+			echo "INSERT INTO history (dirname, filename, created, deleted, freq) VALUES ('$clean_dirname', '$clean_filename', '$NOW', NULL, 0);"
 			dirname="${fullname%/*}"
 			test "$dirname" = "$fullname" && dirname=""
-			filename="${fullname##*/}"
-			add_file "$dirname" "$filename"
+			newname="$fullname#$NOW"
+			mkdir -p "$BACKUP"/"$dirname"
+			ln "$BACKUP_CURRENT"/"$fullname" "$BACKUP"/"$newname"
+			;;
+		( D ) # Deleted
+			echo "UPDATE history
+				SET
+					deleted = '$NOW',
+					freq = CASE
+						WHEN created < '$first_day_of_month' THEN 1
+						WHEN created < '$last_sunday' THEN 5
+						WHEN created < '$last_midnight' THEN 30
+						WHEN created < '$first_minute_of_hour' THEN 720
+						ELSE 8640
+					END
+				WHERE dirname = '$clean_dirname'
+				AND filename = '$clean_filename'
+				AND freq = 0;"
 			;;
 	esac
-done | $SQLITE
-
-echo 'finding changed files...'
-(cd "$BACKUP_TMP" && find -type f) >new_files
-echo "updating $(cat new_files | wc -l) files in db..."
-cat new_files | while read fullname; do
-	fullname="${fullname#./}" # remove leading ./
-	dirname="${fullname%/*}"
-	test "$dirname" = "$fullname" && dirname=""
-	filename="${fullname##*/}"
-	newname="$fullname#$NOW"
-	mkdir -p "$BACKUP"/"$dirname"
-	mv "$BACKUP_TMP"/"$fullname" "$BACKUP"/"$newname"
-	# escape vars for DB
-	dirname="$(echo "$dirname" | sed "s/'/''/g")"
-	filename="$(echo "$filename" | sed "s/'/''/g")"
-	echo "UPDATE history
-		SET
-			deleted = '$NOW',
-			freq = CASE
-				WHEN created < '$first_day_of_month' THEN 1
-				WHEN created < '$last_sunday' THEN 5
-				WHEN created < '$last_midnight' THEN 30
-				WHEN created < '$first_minute_of_hour' THEN 720
-				ELSE 8640
-			END
-		WHERE dirname = '$dirname'
-		AND filename = '$filename'
-		AND freq = 0;"
-	test -f "$BACKUP_CURRENT"/"$fullname" && add_file "$dirname" "$filename"
 done | $SQLITE
 
 echo 'done!'
