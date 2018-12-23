@@ -30,7 +30,7 @@ SQLITE="sqlite3 $SQLITE_DB"
 ### DIFF ###
 
 echo 'listing all files...'
-(find "$BACKUP_CURRENT" -type f -printf '%i %P\n' ) | sort --key 2 >"$BACKUP_LIST".new
+(find "$BACKUP_CURRENT" \( -type f -o -type l \) -printf '%i %P\n' ) | sort --key 2 >"$BACKUP_LIST".new
 
 echo "found files: $(wc -l "$BACKUP_LIST".new)"
 
