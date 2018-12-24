@@ -1,35 +1,26 @@
-FROM=/backups/flower
+#!/bin/sh
+#
+# Script to convert from "old" (rsync --link-dest) style to current one.
+#
+# "old style" expected to be like {hourly,daily,monthly,etc}/$(date +"%F_%T")
+#
+# Call it like this:
+# $ conv.sh /backups/homes homes
 
-ROOT=$FROM/.new
+test -z "$BACKUP_ROOT"    && exit 2
 
-# SRC
-# export DST="flower"
-export BACKUP_CURRENT=$ROOT/current
-export BACKUP_LIST=$ROOT/files.txt
-export BACKUP_TMP=$ROOT/tmp
-export BACKUP=$ROOT/data
-export BACKUP_LOG=$ROOT/rsync.log
-export SQLITE_DB=$ROOT/backup.db
+test -z "$BACKUP_CURRENT" && BACKUP_CURRENT=$BACKUP_ROOT/current
 
-rm -rf $ROOT
-mkdir -p $BACKUP_CURRENT $BACKUP_TMP $BACKUP
+SRC="$1"
+DST="$2"
 
-sqlite3 $SQLITE_DB "CREATE TABLE IF NOT EXISTS history(
-dirname TEXT NOT NULL,
-filename TEXT NOT NULL,
-created TEXT NOT NULL,
-deleted TEXT,
-freq INTEGER NOT NULL);
-CREATE INDEX history_update ON history (dirname, filename) WHERE freq = 0;"
-
-(cd $FROM; ls -d */*/) | sed 's_/_ _' | sort -k 2 | uniq -f 1 | sed 's_ _/_' | while read dir; do
-	# export SRC="$FROM/$dir"
-	rm -rf $BACKUP_CURRENT/flower
-	cp -al "$FROM/$dir" $BACKUP_CURRENT/flower
+(cd "$SRC"; ls -d */*/) | sed 's_/_ _' | sort -k 2 | uniq -f 1 | sed 's_ _/_' | while read dir; do
+	rm -rf "$BACKUP_CURRENT/$DST"
+	cp -al "$SRC/$dir" "$BACKUP_CURRENT/$DST"
 	dir="${dir#*/}"
 	dir="${dir%/}"
-	export NOW="$(echo "$dir" | sed 's/_/ /')"
-	echo "processing [$NOW]..."
-	time bash ~/git/backup3/backup.sh || exit 1
+	export BACKUP_TIME="$(echo "$dir" | sed 's/_/ /')"
+	echo "processing [$BACKUP_TIME]..."
+	bash ~/git/backup3/backup.sh || exit 1
 done
 
