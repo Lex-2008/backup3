@@ -10,11 +10,18 @@ test -z "$BACKUP_ROOT"    && exit 2
 
 test -z "$BACKUP_CURRENT" && BACKUP_CURRENT=$BACKUP_ROOT/current
 test -z "$BACKUP_LIST"    && BACKUP_LIST=$BACKUP_ROOT/files.txt
+test -z "$BACKUP_FLOCK"   && BACKUP_FLOCK=$BACKUP_ROOT/lock
 test -z "$BACKUP_MAIN"    && BACKUP_MAIN=$BACKUP_ROOT/data
 test -z "$BACKUP_DB"      && BACKUP_DB=$BACKUP_ROOT/backup.db
 test -z "$BACKUP_TIME"    && BACKUP_TIME="$(date +"%F %T")"
 
 SQLITE="sqlite3 $BACKUP_DB"
+
+# exit if there is another copy of this script running
+exec 200>"$BACKUP_FLOCK"
+flock -n 200 || exit 200
+
+### RSYNC ###
 
 ### DIFF ###
 
