@@ -4,7 +4,9 @@
 #
 # Note: this is *bash* script due to 2x speed improvements that variable
 # replacement like this: "${varname//a/n}" gives us over calling external
-# tool like this: "$(echo "$varname" | sed 's/a/b/g')"
+# tool like this: "$(echo "$varname" | sed 's/a/b/g')".
+# Also, we use "startswith" bashism at the end of this script:
+# if [[ "$string" == "$prefix"* ]]; then
 
 test -z "$BACKUP_ROOT"    && exit 2
 
@@ -12,7 +14,7 @@ test -z "$BACKUP_CURRENT" && BACKUP_CURRENT=$BACKUP_ROOT/current
 test -z "$BACKUP_LIST"    && BACKUP_LIST=$BACKUP_ROOT/files.txt
 test -z "$BACKUP_FLOCK"   && BACKUP_FLOCK=$BACKUP_ROOT/lock
 test -z "$BACKUP_MAIN"    && BACKUP_MAIN=$BACKUP_ROOT/data
-test -z "$BACKUP_DB"      && BACKUP_DB=$BACKUP_ROOT/backup.db
+test -z "$BACKUP_DB"      && BACKUP_DB=$BACKUP_CURRENT/backup.db
 test -z "$BACKUP_TIME"    && BACKUP_TIME="$(date +"%F %T")"
 
 SQLITE="sqlite3 $BACKUP_DB"
@@ -98,3 +100,11 @@ cat "$BACKUP_LIST".diff | (
 	echo "END TRANSACTION;"
 ) | $SQLITE
 
+###
+
+if [[ "$BACKUP_DB" == "$BACKUP_CURRENT"* ]]; then
+	# break hardlink between file in backup and working database, so next
+	# time we write to the working database - backed up won't update
+	cp -p "$BACKUP_DB" "$BACKUP_DB".new
+	mv -f "$BACKUP_DB".new "$BACKUP_DB"
+fi

@@ -7,7 +7,7 @@ test -z "$BACKUP_ROOT"    && exit 2
 
 test -z "$BACKUP_CURRENT" && BACKUP_CURRENT=$BACKUP_ROOT/current
 test -z "$BACKUP_MAIN"    && BACKUP_MAIN=$BACKUP_ROOT/data
-test -z "$BACKUP_DB"      && BACKUP_DB=$BACKUP_ROOT/backup.db
+test -z "$BACKUP_DB"      && BACKUP_DB=$BACKUP_CURRENT/backup.db
 
 SQLITE="sqlite3 $BACKUP_DB"
 
