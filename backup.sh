@@ -23,6 +23,25 @@ flock -n 200 || exit 200
 
 ### RSYNC ###
 
+# run rsync to backup from $1 to $2, with $3 extra arguments
+run_rsync()
+{
+	rsync -a --fake-super --delete --one-file-system "$1" "$BACKUP_CURRENT/$2" $3
+}
+
+# run command $1 if date (formatted as $2) have changed
+run_if_date_changed()
+{
+	test "$(date -r "$BACKUP_LIST" +"$1")" != "$(date -d "$BACKUP_TIME" +"$1")" && $2
+}
+
+# run
+run_always
+run_if_date_changed "%F %H" run_hourly
+run_if_date_changed "%F" run_daily
+run_if_date_changed "%Y %W" run_weekly
+run_if_date_changed "%Y-%m" run_monthly
+
 ### DIFF ###
 
 # listing all files together with their inodes currently in backup dir
@@ -32,6 +51,7 @@ flock -n 200 || exit 200
 diff --new-file "$BACKUP_LIST" "$BACKUP_LIST".new | sed '/^[<>]/!d;s/^\(.\) [0-9]*/\1/;s/^>/N/;s/^</D/' | sort --key=2,1 >"$BACKUP_LIST".diff
 
 mv "$BACKUP_LIST".new "$BACKUP_LIST"
+touch -d "$BACKUP_TIME" "$BACKUP_LIST"
 
 ### BACKUP ###
 
