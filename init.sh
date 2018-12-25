@@ -20,7 +20,8 @@ $SQLITE "CREATE TABLE history(
 	deleted TEXT,
 	freq INTEGER NOT NULL);
 CREATE INDEX history_update
-ON history(
-	dirname,
-	filename)
-WHERE freq = 0;"
+	ON history(dirname, filename)
+	WHERE freq = 0;
+CREATE INDEX clean ON history(freq, deleted) WHERE freq != 0;
+PRAGMA journal_mode=WAL;
+"
