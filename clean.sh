@@ -17,6 +17,9 @@ test -z "$BACKUP_DB"      && BACKUP_DB=$BACKUP_CURRENT/backup.db
 
 SQLITE="sqlite3 $BACKUP_DB"
 
+NL="
+"
+
 case "$2" in
 	( "%" )
 		total_space=$(df -B1 --output=size "$BACKUP_MAIN" | sed '1d')
@@ -32,8 +35,9 @@ esac
 # return status of 0 (true) means "need to clear space"
 check_space()
 {
-	free_space_available=$(df -B1 --output=avail "$BACKUP_MAIN" | sed '1d')
-	test $free_space_available -lt $FREE_SPACE_NEEDED
+	free_space_available="$(df -B1 --output=avail "$BACKUP_MAIN")"
+	free_space_available="${free_space_available#*$NL}"
+	test "$free_space_available" -lt "$FREE_SPACE_NEEDED"
 }
 
 while check_space; do
