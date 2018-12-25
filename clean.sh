@@ -52,7 +52,8 @@ while check_space; do
 		test "$dirname" = "" && dirname="."
 		fullname="$dirname/$filename"
 		newname="$fullname#$created"
-		rm -f "$BACKUP_MAIN"/"$newname"
+		rm -f "$BACKUP_MAIN/$newname"
+		echo "deleting [$BACKUP_MAIN/$newname]"
 		$SQLITE "DELETE FROM history WHERE rowid=$rowid;"
 	done
 done
