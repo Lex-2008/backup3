@@ -63,6 +63,7 @@ last_midnight="$(date -d "$(date -d "$BACKUP_TIME" "+%F")" +"%F %T")"
 first_minute_of_hour="$(date -d "$(date -d "$BACKUP_TIME" "+%F %H:00")" +"%F %T")"
 
 cat "$BACKUP_LIST".diff | (
+	echo ".timeout 10000"
 	echo "BEGIN TRANSACTION;"
 	while read change fullname; do
 		# escape vars for DB
