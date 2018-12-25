@@ -118,7 +118,6 @@ if [[ "$BACKUP_DB" == "$BACKUP_CURRENT"* ]]; then
 	backup_db_filename="${BACKUP_DB:${#BACKUP_CURRENT}}"
 	backup_db_filename="${backup_db_filename#/}"
 	backup_db_backup="$BACKUP_MAIN/$backup_db_filename#$BACKUP_TIME"
-	ls -lai "$BACKUP_DB" "$backup_db_backup"
 	rm "$backup_db_backup"
 	$SQLITE ".backup '$backup_db_backup'"
 fi
