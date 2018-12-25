@@ -1,14 +1,21 @@
 backup3
 =======
 
-My third attempt at making backups (hence the name) - using bash and SQLite.
+My ~~third~~ _actually, forth_ attempt at making backups - using bash and SQLite.
 
 Setup
 -----
 
+Find a writeable dir to keep your backups in (say, `/var/backups`) and run:
+
+	BACKUP_ROOT=/var/backups init.sh
+
+It will create necessary dirs and sqlite database to hold information.
+
 ### Requirements
 
 * sqlite3
+* flock
 * bc
 * df
 
@@ -67,3 +74,23 @@ above file:
 	# delete old versions until at least 10% of disk space is free
 	clean.sh 10 %
 
+Restore from backup
+-------------------
+
+You can either dig manually in data dir, or use `flat.sh` to show contents of
+archive for a given date.
+
+Check that database is correct
+------------------------------
+
+It may happen that data in database is out of sync with actual files. To check
+for that, run `check.sh`. To fix it by deleting existing DB records for missing
+files and existing files for missing DB records, run `check.sh --delete`.
+
+Rollback backup to previous version
+-----------------------------------
+
+In default configuration, backup database is backed up every time, too. To
+restore it, pick one that you like and move it in place of current one
+(`$BACKUP_ROOT/current/backup.db` by default). After that, run
+`check.sh --delete` to synchronize DB with FS.
