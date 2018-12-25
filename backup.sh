@@ -69,7 +69,7 @@ cat "$BACKUP_LIST".diff | (
 		clean_fullname="${fullname//\'/\'\'}"
 		# clean_fullname="$(echo "$fullname" | sed "s/'/''/g")"
 		clean_dirname="${clean_fullname%/*}"
-		test "$clean_dirname" = "$clean_fullname" && dirname=""
+		test "$clean_dirname" = "$clean_fullname" && clean_dirname=""
 		clean_filename="${clean_fullname##*/}"
 		case "$change" in
 			( N ) # New file
