@@ -50,7 +50,7 @@ run_if_date_changed "%Y-%m" run_monthly
 (find "$BACKUP_CURRENT" \( -type f -o -type l \) -printf '%i %P\n' ) | sort --key 2 >"$BACKUP_LIST".new
 
 # comparing this list to its previous version
-diff --new-file "$BACKUP_LIST" "$BACKUP_LIST".new | sed '/^[<>]/!d;s/^\(.\) [0-9]*/\1/;s/^>/N/;s/^</D/' | sort --key=2,1 >"$BACKUP_LIST".diff
+diff --new-file "$BACKUP_LIST" "$BACKUP_LIST".new | sed '/^[<>]/!d;s/^\(.\) [0-9]*/\1/;s/^>/N/;s/^</D/' | sort --key=2 --key=1 >"$BACKUP_LIST".diff
 
 mv "$BACKUP_LIST".new "$BACKUP_LIST"
 touch -d "$BACKUP_TIME" "$BACKUP_LIST"
