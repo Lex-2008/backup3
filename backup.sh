@@ -55,6 +55,14 @@ diff --new-file "$BACKUP_LIST" "$BACKUP_LIST".new | sed '/^[<>]/!d;s/^\(.\) [0-9
 mv "$BACKUP_LIST".new "$BACKUP_LIST"
 touch -d "$BACKUP_TIME" "$BACKUP_LIST"
 
+if [[ "$BACKUP_DB" == "$BACKUP_CURRENT"* ]]; then
+	# Database inode doesn't change, so add it manually
+	backup_db_filename="${BACKUP_DB:${#BACKUP_CURRENT}}"
+	backup_db_filename="${backup_db_filename#/}"
+	echo "D $backup_db_filename" >"$BACKUP_LIST".diff
+	echo "N $backup_db_filename" >"$BACKUP_LIST".diff
+fi
+
 ### BACKUP ###
 
 first_day_of_month="$(date -d "$(date -d "$BACKUP_TIME" "+%Y-%m-01")" +"%F %T")"
@@ -101,11 +109,16 @@ cat "$BACKUP_LIST".diff | (
 	echo "END TRANSACTION;"
 ) | $SQLITE
 
-###
+### Database backup ###
 
 if [[ "$BACKUP_DB" == "$BACKUP_CURRENT"* ]]; then
-	# break hardlink between file in backup and working database, so next
-	# time we write to the working database - backed up won't update
-	cp -p "$BACKUP_DB" "$BACKUP_DB".new
-	mv -f "$BACKUP_DB".new "$BACKUP_DB"
+	# Above stuff created hardlink to database in backup dir. It's not
+	# useful as a backup, so we break the hardlink by using SQLite "backup"
+	# command. But first we need to figure out name of backup file
+	backup_db_filename="${BACKUP_DB:${#BACKUP_CURRENT}}"
+	backup_db_filename="${backup_db_filename#/}"
+	backup_db_backup="$BACKUP_MAIN/$backup_db_filename#$BACKUP_TIME"
+	ls -lai "$BACKUP_DB" "$backup_db_backup"
+	rm "$backup_db_backup"
+	$SQLITE ".backup '$backup_db_backup'"
 fi
