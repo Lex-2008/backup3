@@ -14,7 +14,8 @@ test -z "$BACKUP_CURRENT" && BACKUP_CURRENT=$BACKUP_ROOT/current
 test -z "$BACKUP_LIST"    && BACKUP_LIST=$BACKUP_ROOT/files.txt
 test -z "$BACKUP_FLOCK"   && BACKUP_FLOCK=$BACKUP_ROOT/lock
 test -z "$BACKUP_MAIN"    && BACKUP_MAIN=$BACKUP_ROOT/data
-test -z "$BACKUP_DB"      && BACKUP_DB=$BACKUP_CURRENT/backup.db
+test -z "$BACKUP_DB"      && BACKUP_DB=$BACKUP_ROOT/backup.db
+test -z "$BACKUP_DB_BAK"  && BACKUP_DB_BAK=backup.db
 test -z "$BACKUP_TIME"    && BACKUP_TIME="$(date +"%F %T")"
 
 SQLITE="sqlite3 $BACKUP_DB"
@@ -55,12 +56,11 @@ diff --new-file "$BACKUP_LIST" "$BACKUP_LIST".new | sed '/^[<>]/!d;s/^\(.\) [0-9
 mv "$BACKUP_LIST".new "$BACKUP_LIST"
 touch -d "$BACKUP_TIME" "$BACKUP_LIST"
 
-if [[ "$BACKUP_DB" == "$BACKUP_CURRENT"* ]]; then
-	# Database inode doesn't change, so add it manually
-	backup_db_filename="${BACKUP_DB:${#BACKUP_CURRENT}}"
-	backup_db_filename="${backup_db_filename#/}"
-	echo "D $backup_db_filename" >"$BACKUP_LIST".diff
-	echo "N $backup_db_filename" >"$BACKUP_LIST".diff
+if test -n "$BACKUP_DB_BAK"; then
+	touch "$BACKUP_CURRENT/$BACKUP_DB_BAK"
+	# Add entries to diff file required for DB backup
+	echo "D $BACKUP_DB_BAK" >>"$BACKUP_LIST".diff
+	echo "N $BACKUP_DB_BAK" >>"$BACKUP_LIST".diff
 fi
 
 ### BACKUP ###
@@ -107,13 +107,10 @@ cat "$BACKUP_LIST".diff | (
 
 ### Database backup ###
 
-if [[ "$BACKUP_DB" == "$BACKUP_CURRENT"* ]]; then
-	# Above stuff created hardlink to database in backup dir. It's not
-	# useful as a backup, so we break the hardlink by using SQLite "backup"
-	# command. But first we need to figure out name of backup file
-	backup_db_filename="${BACKUP_DB:${#BACKUP_CURRENT}}"
-	backup_db_filename="${backup_db_filename#/}"
-	backup_db_backup="$BACKUP_MAIN/$backup_db_filename#$BACKUP_TIME"
+if test -n "$BACKUP_DB_BAK"; then
+	# Backup database
+	mkdir -p "$BACKUP_MAIN/$BACKUP_DB_BAK"
+	backup_db_backup="$BACKUP_MAIN/$BACKUP_DB_BAK/$BACKUP_TIME"
 	rm "$backup_db_backup"
 	$SQLITE ".backup '$backup_db_backup'"
 fi
