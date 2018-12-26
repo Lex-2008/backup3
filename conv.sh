@@ -14,13 +14,15 @@ test -z "$BACKUP_CURRENT" && BACKUP_CURRENT=$BACKUP_ROOT/current
 SRC="$1"
 DST="$2"
 
+test -e "$BACKUP_CURRENT/$DST" && exit 3
+
 (cd "$SRC"; ls -d */*/) | sed 's_/_ _' | sort -k 2 | uniq -f 1 | sed 's_ _/_' | while read dir; do
-	rm -rf "$BACKUP_CURRENT/$DST"
-	cp -al "$SRC/$dir" "$BACKUP_CURRENT/$DST"
-	dir="${dir#*/}"
-	dir="${dir%/}"
-	export BACKUP_TIME="$(echo "$dir" | sed 's/_/ /')"
-	echo "processing [$BACKUP_TIME]..."
-	bash ~/git/backup3/backup.sh || exit 1
+	mv "$SRC/$dir" "$BACKUP_CURRENT/$DST"
+	time="${dir#*/}"
+	time="${time%/}"
+	export BACKUP_TIME="$(echo "$time" | sed 's/_/ /')"
+	echo "processing [$BACKUP_TIME] from [$SRC/$dir]..."
+	bash ~/backup3/backup.sh
+	mv "$BACKUP_CURRENT/$DST" "$SRC/$dir"
 done
 
