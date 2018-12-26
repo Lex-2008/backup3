@@ -66,7 +66,7 @@ fi
 ### BACKUP ###
 
 first_day_of_month="$(date -d "$(date -d "$BACKUP_TIME" "+%Y-%m-01")" +"%F %T")"
-last_sunday="$(date -d "$(date -d "-$(date -d "$BACKUP_TIME" +%w) days" +"%Y-%m-%d")" +"%F %T")"
+last_sunday="$(date -d "$(date -d "$(date -d "$BACKUP_TIME" "+%F") -$(date -d "$BACKUP_TIME" +%w) days" +"%Y-%m-%d")" +"%F %T")"
 last_midnight="$(date -d "$(date -d "$BACKUP_TIME" "+%F")" +"%F %T")"
 first_minute_of_hour="$(date -d "$(date -d "$BACKUP_TIME" "+%F %H:00")" +"%F %T")"
 
