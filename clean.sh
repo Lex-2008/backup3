@@ -47,13 +47,14 @@ while check_space; do
 			created,
 			MIN(deleted),
 			freq,
-			freq*(strftime('%s', 'now')-deleted) AS age
+			freq*(strftime('%s', 'now')-strftime('%s', deleted)) AS age
 		FROM history
 		WHERE freq != 0
 		GROUP BY freq
 		ORDER BY age DESC
 		LIMIT 1;" | while IFS='|' read rowid dirname filename created deleted freq age; do
 		test "$dirname" = "" && dirname="."
+		# ls -la "$BACKUP_MAIN/$dirname/$filename/$created"
 		rm -f "$BACKUP_MAIN/$dirname/$filename/$created"
 		$SQLITE "DELETE FROM history WHERE rowid=$rowid;"
 	done
