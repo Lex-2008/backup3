@@ -3,6 +3,41 @@ backup3
 
 My ~~third~~ _actually, forth_ attempt at making backups - using bash and SQLite.
 
+Background
+----------
+
+### History
+
+My [previous backup system][1] was based on hardlinks - as often as every 5 minutes most of backup tree was `cp -al`'ed from _previous_ to newly-created _current_ dir, and then `rsync` was running to apply any changes.
+As a result - I had snapshots as frequent as every 5 minutes, each of them contained only changes since last rsync run (few megabytes).
+Advanced heuristic was running to delete old snapshots while keeping some of them (hourly, daily, monthly) longer.
+Sounds good, right?
+
+[1]: http://alexey.shpakovsky.ru/en/rsync-backups.html
+
+And it was good indeed, while I assumed that directories are created and deleted instantly.
+But after a while I noticed that cleaning up disk space takes awfully long time: deleting each snapshot took 10~15 minutes, and freed only a few megabytes.
+How long should it be running to clean 10 Gb?
+
+### Idea
+
+So the idea is to keep only _one_ copy of each inuque file, plus keep _somewhere_ a time range when it existed, and use a script to reconstruct file tree for a given time using this data. Sounds like a good task for a database?
+
+So it work like this:
+
+* First, rsync updates all files in a "current backup" directory.
+  By default it doesn't do it "in place" - instead, it first creates new version and then replaces old one with it, so its inode number changes.
+  Note this, we will use it later.
+
+* Then, we compare current state of "current backup" dir with what was there previousely:
+
+  * New files we hardlink to "storage" directory (so they didn't get lost if deleted from "current backup"),
+    and record them into database, together with "creation" date.
+
+  * For deleted files we just note their "deletion" date in the database.
+
+  * Changed files we treat as "old version deleted, new version created".
+
 Setup
 -----
 
