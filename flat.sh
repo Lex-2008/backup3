@@ -31,11 +31,10 @@ $SQLITE "PRAGMA case_sensitive_like = ON;
 	mkdir -p "$SHOW_IN"/"$dirname"
 	fullname="$dirname/$filename"
 	if test -n "$created"; then
-		newname="$fullname#$created"
-		ln "$BACKUP_MAIN"/"$newname" "$SHOW_IN"/"$fullname"
+		newname="$BACKUP_MAIN/$dirname/$filename/$created"
 	else
-		newname="$fullname"
-		ln "$BACKUP_CURRENT"/"$newname" "$SHOW_IN"/"$fullname"
+		newname="$BACKUP_CURRENT/$dirname/$filename"
 	fi
+	ln "$newname" "$SHOW_IN/$dirname/$filename"
 	deleted=""
 done

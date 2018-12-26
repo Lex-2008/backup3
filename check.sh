@@ -27,9 +27,9 @@ $SQLITE "SELECT rowid, dirname, filename, created
 	ORDER BY dirname;" | while IFS='|' read rowid dirname filename created; do
 	fullname="$dirname/$filename"
 	if test -n "$created"; then
-		newname="$BACKUP_MAIN/$fullname#$created"
+		newname="$BACKUP_MAIN/$dirname/$filename/$created"
 	else
-		newname="$BACKUP_CURRENT/$fullname"
+		newname="$BACKUP_CURRENT/$dirname/$filename"
 	fi
 	if ! test -e "$newname"; then
 		echo "Missing file: [$newname] [$dirname][$filename][$created]" >&2
@@ -74,11 +74,11 @@ $SQLITE "CREATE INDEX IF NOT EXISTS check_old ON history(dirname, filename, crea
 find "$BACKUP_MAIN" \( -type f -o -type l \) -printf '%P\n' | while read fullname; do
 	# escape vars for DB
 	clean_fullname="${fullname//\'/\'\'}"
-	clean_dirname="${clean_fullname%/*}"
-	test "$clean_dirname" = "$clean_fullname" && clean_dirname=""
-	clean_filename="${clean_fullname##*/}"
-	clean_created="${clean_filename##*#}"
-	clean_filename="${clean_filename%#*}"
+	clean_created="${clean_fullname##*/}"
+	clean_dirfilename="${clean_fullname%/*}"
+	clean_filename="${clean_dirfilename##*/}"
+	clean_dirname="${clean_dirfilename%/*}"
+	test "$clean_dirname" = "$clean_dirfilename" && clean_dirname=""
 	echo "SELECT
 		CASE
 		WHEN EXISTS(SELECT 1

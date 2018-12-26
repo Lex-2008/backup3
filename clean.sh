@@ -54,9 +54,7 @@ while check_space; do
 		ORDER BY age DESC
 		LIMIT 1;" | while IFS='|' read rowid dirname filename created deleted freq age; do
 		test "$dirname" = "" && dirname="."
-		fullname="$dirname/$filename"
-		newname="$fullname#$created"
-		rm -f "$BACKUP_MAIN/$newname"
+		rm -f "$BACKUP_MAIN/$dirname/$filename/$created"
 		$SQLITE "DELETE FROM history WHERE rowid=$rowid;"
 	done
 done

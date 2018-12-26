@@ -76,18 +76,14 @@ cat "$BACKUP_LIST".diff | (
 	while read change fullname; do
 		# escape vars for DB
 		clean_fullname="${fullname//\'/\'\'}"
-		# clean_fullname="$(echo "$fullname" | sed "s/'/''/g")"
 		clean_dirname="${clean_fullname%/*}"
 		test "$clean_dirname" = "$clean_fullname" && clean_dirname=""
 		clean_filename="${clean_fullname##*/}"
 		case "$change" in
 			( N ) # New file
 				echo "INSERT INTO history (dirname, filename, created, deleted, freq) VALUES ('$clean_dirname', '$clean_filename', '$BACKUP_TIME', NULL, 0);"
-				dirname="${fullname%/*}"
-				test "$dirname" = "$fullname" && dirname=""
-				newname="$fullname#$BACKUP_TIME"
-				mkdir -p "$BACKUP_MAIN"/"$dirname"
-				ln "$BACKUP_CURRENT"/"$fullname" "$BACKUP_MAIN"/"$newname"
+				mkdir -p "$BACKUP_MAIN/$fullname"
+				ln "$BACKUP_CURRENT/$fullname" "$BACKUP_MAIN/$fullname/$BACKUP_TIME"
 				;;
 			( D ) # Deleted
 				echo "UPDATE history
