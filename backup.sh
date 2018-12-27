@@ -36,11 +36,12 @@ run_rsync()
 # run command $1 if date (formatted as $2) have changed
 run_if_date_changed()
 {
+	command -v "${2%% *}" >/dev/null || return 0
 	test "$(date -r "$BACKUP_LIST" +"$1")" != "$(date -d "$BACKUP_TIME" +"$1")" && $2
 }
 
 # run
-run_always
+command -v run_always >/dev/null && run_always
 run_if_date_changed "%F %H" run_hourly
 run_if_date_changed "%F" run_daily
 run_if_date_changed "%Y %W" run_weekly
