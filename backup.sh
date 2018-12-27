@@ -14,6 +14,7 @@ test -z "$BACKUP_CURRENT" && BACKUP_CURRENT=$BACKUP_ROOT/current
 test -z "$BACKUP_LIST"    && BACKUP_LIST=$BACKUP_ROOT/files.txt
 test -z "$BACKUP_FLOCK"   && BACKUP_FLOCK=$BACKUP_ROOT/lock
 test -z "$BACKUP_MAIN"    && BACKUP_MAIN=$BACKUP_ROOT/data
+test -z "$BACKUP_FIND_FILTER" # this is fine
 test -z "$BACKUP_DB"      && BACKUP_DB=$BACKUP_ROOT/backup.db
 test -z "$BACKUP_DB_BAK"  && BACKUP_DB_BAK=backup.db
 test -z "$BACKUP_TIME"    && BACKUP_TIME="$(date +"%F %T")"
@@ -48,7 +49,7 @@ run_if_date_changed "%Y-%m" run_monthly
 ### DIFF ###
 
 # listing all files together with their inodes currently in backup dir
-(find "$BACKUP_CURRENT" \( -type f -o -type l \) -printf '%i %P\n' ) | sort --key 2 >"$BACKUP_LIST".new
+(find "$BACKUP_CURRENT" $BACKUP_FIND_FILTER \( -type f -o -type l \) -printf '%i %P\n' ) | sort --key 2 >"$BACKUP_LIST".new
 
 # comparing this list to its previous version
 diff --new-file "$BACKUP_LIST" "$BACKUP_LIST".new | sed '/^[<>]/!d;s/^\(.\) [0-9]*/\1/;s/^>/N/;s/^</D/' | sort --key=2 --key=1 >"$BACKUP_LIST".diff
