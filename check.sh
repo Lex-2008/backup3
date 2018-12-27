@@ -98,4 +98,4 @@ done | $SQLITE | fgrep -v -x 1 | (
 	fi
 )
 
-$SQLITE "DROP INDEX check_old;"
+$SQLITE "DROP INDEX check_old;VACUUM;"
