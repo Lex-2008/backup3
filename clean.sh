@@ -58,7 +58,6 @@ $SQLITE "SELECT rowid,
 		while check_space; do
 			read rowid dirname filename created deleted freq age
 			test "$dirname" = "" && dirname="."
-			echo "$BACKUP_MAIN/$dirname/$filename/$created" >&2
 			rm -f "$BACKUP_MAIN/$dirname/$filename/$created"
 			echo "DELETE FROM history WHERE rowid=$rowid;"
 		done
