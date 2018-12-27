@@ -99,3 +99,9 @@ done | $SQLITE | fgrep -v -x 1 | (
 )
 
 $SQLITE "DROP INDEX check_old;VACUUM;"
+
+echo "Checking current FS => old FS"
+
+find "$BACKUP_CURRENT" \( -type f -o -type l \) -printf '%i %P\n' | while read inode fullname; do
+	ls -if "$BACKUP_MAIN/$fullname" | grep -q "^$inode " || echo "$fullname"
+done
