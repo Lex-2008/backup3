@@ -42,6 +42,8 @@ check_space()
 
 check_space || exit 0 # no cleanup needed
 
+# uses 'timeline' index to get rows with freq!=0, then builds a new index for
+# age
 $SQLITE "SELECT rowid,
 		dirname,
 		filename,
