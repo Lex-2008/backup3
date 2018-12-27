@@ -17,13 +17,15 @@ DST="$2"
 
 test -e "$BACKUP_CURRENT/$DST" && exit 3
 
-(cd "$SRC"; ls -d */*/) | sed 's_/_ _' | sort -k 2 | uniq -f 1 | sed 's_ _/_' | while read dir; do
-	mv "$SRC/$dir" "$BACKUP_CURRENT/$DST"
-	time="${dir#*/}"
-	time="${time%/}"
-	export BACKUP_TIME="$(echo "$time" | sed 's/_/ /')"
-	echo "processing [$BACKUP_TIME] from [$SRC/$dir]..."
-	bash ~/backup3/backup.sh
-	mv "$BACKUP_CURRENT/$DST" "$SRC/$dir"
-done
-
+(cd "$SRC"; ls -d */*/) | sed 's_/_ _' | sort -k 2 | uniq -f 1 | sed 's_ _/_' | (
+	while read dir; do
+		mv "$SRC/$dir" "$BACKUP_CURRENT/$DST"
+		time="${dir#*/}"
+		time="${time%/}"
+		export BACKUP_TIME="$(echo "$time" | sed 's/_/ /')"
+		echo "processing [$BACKUP_TIME] from [$SRC/$dir]..."
+		bash ~/backup3/backup.sh
+		mv "$BACKUP_CURRENT/$DST" "$SRC/$dir"
+	done
+	cp -al "$SRC/$dir" "$BACKUP_CURRENT/$DST"
+)
