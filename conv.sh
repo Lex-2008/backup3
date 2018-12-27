@@ -10,6 +10,7 @@
 test -z "$BACKUP_ROOT"    && exit 2
 
 test -z "$BACKUP_CURRENT" && BACKUP_CURRENT=$BACKUP_ROOT/current
+export BACKUP_DB_BAK=no
 
 SRC="$1"
 DST="$2"

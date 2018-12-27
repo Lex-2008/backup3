@@ -56,7 +56,7 @@ diff --new-file "$BACKUP_LIST" "$BACKUP_LIST".new | sed '/^[<>]/!d;s/^\(.\) [0-9
 mv "$BACKUP_LIST".new "$BACKUP_LIST"
 touch -d "$BACKUP_TIME" "$BACKUP_LIST"
 
-if test -n "$BACKUP_DB_BAK"; then
+if test "$BACKUP_DB_BAK" != "no"; then
 	touch "$BACKUP_CURRENT/$BACKUP_DB_BAK"
 	# Add entries to diff file required for DB backup
 	echo "D $BACKUP_DB_BAK" >>"$BACKUP_LIST".diff
@@ -107,7 +107,7 @@ cat "$BACKUP_LIST".diff | (
 
 ### Database backup ###
 
-if test -n "$BACKUP_DB_BAK"; then
+if test "$BACKUP_DB_BAK" != "no"; then
 	# Backup database
 	mkdir -p "$BACKUP_MAIN/$BACKUP_DB_BAK"
 	backup_db_backup="$BACKUP_MAIN/$BACKUP_DB_BAK/$BACKUP_TIME"
