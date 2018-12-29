@@ -169,3 +169,14 @@ $SQLITE "SELECT *
 		WHEN substr(created, 1, 13) != substr(deleted, 1, 13) THEN 720 -- different hour
 		ELSE 8640
 	END;"
+
+# $SQLITE "UPDATE history
+# 	SET freq = CASE
+# 		WHEN substr(created, 1, 7) != substr(deleted, 1, 7) THEN 1 -- different month
+# 		WHEN strftime('%Y %W', created) != strftime('%Y %W', deleted) THEN 5 -- different week
+# 		WHEN substr(created, 1, 10) != substr(deleted, 1, 10) THEN 30 -- different day
+# 		WHEN substr(created, 1, 13) != substr(deleted, 1, 13) THEN 720 -- different hour
+# 		ELSE 8640
+# 	END
+# 	WHERE freq != 0;"
+
