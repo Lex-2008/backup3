@@ -22,7 +22,7 @@ test -e "$BACKUP_CURRENT/$DST" && exit 3
 		mv "$SRC/$dir" "$BACKUP_CURRENT/$DST"
 		time="${dir#*/}"
 		time="${time%/}"
-		export BACKUP_TIME="$(echo "$time" | sed 's/_/ /')"
+		export BACKUP_TIME="$(date -d "$(echo "$time" | sed 's/_/ /')" +"%F %H:%M")"
 		echo "processing [$BACKUP_TIME] from [$SRC/$dir]..."
 		bash ~/backup3/backup.sh
 		mv "$BACKUP_CURRENT/$DST" "$SRC/$dir"

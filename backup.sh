@@ -17,7 +17,8 @@ test -z "$BACKUP_MAIN"    && BACKUP_MAIN=$BACKUP_ROOT/data
 test -z "$BACKUP_FIND_FILTER" # this is fine
 test -z "$BACKUP_DB"      && BACKUP_DB=$BACKUP_ROOT/backup.db
 test -z "$BACKUP_DB_BAK"  && BACKUP_DB_BAK=backup.db
-test -z "$BACKUP_TIME"    && BACKUP_TIME="$(date +"%F %T")"
+test -n "$BACKUP_TIME"    && BACKUP_TIME="$(date -d "$BACKUP_TIME" +"%F %H:%M")"
+test -z "$BACKUP_TIME"    && BACKUP_TIME="$(date +"%F %H:%M")"
 
 SQLITE="sqlite3 $BACKUP_DB"
 
@@ -67,10 +68,10 @@ fi
 
 ### BACKUP ###
 
-first_day_of_month="$(date -d "$(date -d "$BACKUP_TIME" "+%Y-%m-01")" +"%F %T")"
-last_sunday="$(date -d "$(date -d "$(date -d "$BACKUP_TIME" "+%F") -$(date -d "$BACKUP_TIME" +%w) days" +"%Y-%m-%d")" +"%F %T")"
-last_midnight="$(date -d "$(date -d "$BACKUP_TIME" "+%F")" +"%F %T")"
-first_minute_of_hour="$(date -d "$(date -d "$BACKUP_TIME" "+%F %H:00")" +"%F %T")"
+this_month="$(date -d "$BACKUP_TIME" +"%Y-%m")"
+this_week="$(date -d "$BACKUP_TIME" +"%Y %W")"
+today="$(date -d "$BACKUP_TIME" +"%F")"
+this_hour="$(date -d "$BACKUP_TIME" +"%F %H")"
 
 cat "$BACKUP_LIST".diff | (
 	echo ".timeout 10000"
@@ -92,10 +93,10 @@ cat "$BACKUP_LIST".diff | (
 					SET
 						deleted = '$BACKUP_TIME',
 						freq = CASE
-							WHEN created < '$first_day_of_month' THEN 1
-							WHEN created < '$last_sunday' THEN 5
-							WHEN created < '$last_midnight' THEN 30
-							WHEN created < '$first_minute_of_hour' THEN 720
+							WHEN created < '$this_month' THEN 1
+							WHEN strftime('%Y %W', created) < '$this_week' THEN 5
+							WHEN created < '$today' THEN 30
+							WHEN created < '$this_hour' THEN 720
 							ELSE 8640
 						END
 					WHERE dirname = '$clean_dirname'
