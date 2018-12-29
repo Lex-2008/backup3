@@ -63,6 +63,8 @@ done | $SQLITE | fgrep -v -x 1 | (
 	if test -n "$DELETE_MISSING"; then
 		cd "$BACKUP_CURRENT"
 		tee /dev/stderr | xargs -d '\n' rm -f
+	else
+		cat
 	fi
 )
 
@@ -95,6 +97,8 @@ done | $SQLITE | fgrep -v -x 1 | (
 	if test -n "$DELETE_MISSING"; then
 		cd "$BACKUP_MAIN"
 		tee /dev/stderr | xargs -d '\n' rm -f
+	else
+		cat
 	fi
 )
 
@@ -103,5 +107,65 @@ $SQLITE "DROP INDEX check_old;VACUUM;"
 echo "Checking current FS => old FS"
 
 find "$BACKUP_CURRENT" \( -type f -o -type l \) -printf '%i %P\n' | while read inode fullname; do
-	ls -if "$BACKUP_MAIN/$fullname" | grep -q "^$inode " || echo "$fullname"
-done
+	ls -if "$BACKUP_MAIN/$fullname" 2>/dev/null | grep -q "^$inode " || echo "$fullname"
+done | (
+	if test -n "$DELETE_MISSING"; then
+		cd "$BACKUP_CURRENT"
+		tee /dev/stderr | xargs -d '\n' rm -f
+	else
+		cat
+	fi
+)
+
+echo "Checking overlapping dates in DB"
+
+$SQLITE "SELECT a.dirname, a.filename, a.rowid, b.rowid, a.created, a.deleted, b.created, b.deleted
+	FROM (SELECT rowid, dirname, filename, created, deleted
+		FROM history
+		) AS a
+	JOIN (SELECT rowid, dirname, filename, created, deleted
+		FROM history
+		WHERE freq != 0
+		) AS b
+	ON a.rowid < b.rowid
+	AND a.dirname = b.dirname
+	AND a.filename = b.filename
+	AND a.created < b.deleted
+	AND b.created < a.deleted;"
+
+
+echo "Checking duplicates in DB"
+
+$SQLITE "SELECT a.dirname, a.filename, a.rowid, b.rowid, a.created, a.deleted, b.created, b.deleted
+	FROM (SELECT rowid, dirname, filename, created, deleted
+		FROM history
+		) AS a
+	JOIN (SELECT rowid, dirname, filename, created, deleted
+		FROM history
+		WHERE freq != 0
+		) AS b
+	ON a.rowid < b.rowid
+	AND a.dirname = b.dirname
+	AND a.filename = b.filename
+	AND ( a.created = b.created
+	   OR a.deleted = b.deleted);"
+
+
+echo "Checking that created < deleted in DB"
+
+$SQLITE "SELECT *
+	FROM history
+	WHERE created >= deleted;"
+
+echo "Checking freq in DB"
+
+$SQLITE "SELECT *
+	FROM history
+	WHERE freq != 0 AND
+	freq != CASE
+		WHEN substr(created, 1, 7) != substr(deleted, 1, 7) THEN 1 -- different month
+		WHEN strftime('%Y %W', created) != strftime('%Y %W', deleted) THEN 5 -- different week
+		WHEN substr(created, 1, 10) != substr(deleted, 1, 10) THEN 30 -- different day
+		WHEN substr(created, 1, 13) != substr(deleted, 1, 13) THEN 720 -- different hour
+		ELSE 8640
+	END;"
