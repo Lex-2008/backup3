@@ -119,6 +119,48 @@ above file:
 You can either dig manually in data dir, or use `flat.sh` to show contents of
 archive for a given date.
 
+Fun stuff
+---------
+
+### Getting total number of rows in database
+
+	sqlite3 $BACKUP_DB 'SELECT count(*) FROM history;'
+
+### Checking disk space used by each dir
+
+	cd $BACKUP_ROOT
+	echo "Disk usage of each dir:"
+	(
+		echo 'name current data'
+		(
+			(
+				echo .
+				ls data
+			) | xargs -I% echo 'echo "% $(test -e current/% && du -BG -d0 current/% | cut -f1) $(du -BG -d0 data/% | cut -f1)"' | sh
+		)
+	) | column -t
+
+### Getting number of files
+
+	# In current backup
+	sqlite3 $BACKUP_DB 'SELECT CASE instr(dirname, "/") WHEN 0 THEN dirname ELSE substr(dirname, 1, instr(dirname, "/")-1) END AS root, count(*) FROM history WHERE freq=0 GROUP BY root LIMIT 10;' | column -tns'|'
+
+	# Deleted
+	sqlite3 $BACKUP_DB 'SELECT CASE instr(dirname, "/") WHEN 0 THEN dirname ELSE substr(dirname, 1, instr(dirname, "/")-1) END AS root, count(*) FROM history WHERE freq!=0 GROUP BY root LIMIT 10;' | column -tns'|'
+
+	# Total
+	sqlite3 $BACKUP_DB 'SELECT CASE instr(dirname, "/") WHEN 0 THEN dirname ELSE substr(dirname, 1, instr(dirname, "/")-1) END AS root, count(*) FROM history GROUP BY root LIMIT 10;' | column -tns'|'
+
+Note that `-n` argument for `column` command is a non-standard Debian extension
+
+### Getting most frequently changed files
+
+	sqlite3 $BACKUP_DB "SELECT dirname, filename, count(*) AS num FROM history GROUP BY dirname, filename ORDER BY num DESC LIMIT 10;"
+
+### Getting latest file in each of "freq" group
+
+	sqlite3 $BACKUP_DB "SELECT freq, MIN(deleted) FROM history WHERE freq != 0 GROUP BY freq;"
+
 Messing with db
 ---------------
 
@@ -147,3 +189,13 @@ and from database, like this:
 	sqlite3 $BACKUP_DB "DELETE FROM history WHERE dirname LIKE 'home/.cache%'"
 
 Or run only one of these two commands, followed by `check.sh --delete`.
+
+### Clean empty dirs
+
+Especially after above command, you're left with a tree of empty directories in
+`$BACKUP_DATA`. To get rid of them, run this command (taken from [this][a]
+stackexchange answer):
+
+	find $BACKUP_MAIN -type d -empty -delete
+
+[a]: https://unix.stackexchange.com/questions/8430/how-to-remove-all-empty-directories-in-a-subtree/107556#107556
