@@ -32,7 +32,7 @@ flock -n 200 || exit 200
 # run rsync to backup from $1 to $2, with $3 extra arguments
 run_rsync()
 {
-	rsync -a --itemise-changes --human-readable --stats --fake-super --delete --one-file-system $3 "$1" "$BACKUP_CURRENT/$2" >"$BACKUP_RSYNC_LOGS/$2"
+	rsync -a --itemize-changes --human-readable --stats --fake-super --delete --one-file-system $3 "$1" "$BACKUP_CURRENT/$2" >"$BACKUP_RSYNC_LOGS/$2"
 }
 
 # run command $1 if date (formatted as $2) have changed
