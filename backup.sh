@@ -14,6 +14,7 @@ test -z "$BACKUP_CURRENT" && BACKUP_CURRENT=$BACKUP_ROOT/current
 test -z "$BACKUP_LIST"    && BACKUP_LIST=$BACKUP_ROOT/files.txt
 test -z "$BACKUP_FLOCK"   && BACKUP_FLOCK=$BACKUP_ROOT/lock
 test -z "$BACKUP_MAIN"    && BACKUP_MAIN=$BACKUP_ROOT/data
+test -z "$BACKUP_RSYNC_LOGS" && BACKUP_RSYNC_LOGS=$BACKUP_ROOT/rsync.logs
 test -z "$BACKUP_FIND_FILTER" # this is fine
 test -z "$BACKUP_DB"      && BACKUP_DB=$BACKUP_ROOT/backup.db
 test -z "$BACKUP_DB_BAK"  && BACKUP_DB_BAK=backup.db
@@ -31,7 +32,7 @@ flock -n 200 || exit 200
 # run rsync to backup from $1 to $2, with $3 extra arguments
 run_rsync()
 {
-	rsync -a --fake-super --delete --one-file-system "$1" "$BACKUP_CURRENT/$2" $3
+	rsync -a --itemise-changes --human-readable --stats --fake-super --delete --one-file-system $3 "$1" "$BACKUP_CURRENT/$2" >"$BACKUP_RSYNC_LOGS/$2"
 }
 
 # run command $1 if date (formatted as $2) have changed
