@@ -29,5 +29,5 @@ test -e "$BACKUP_CURRENT/$DST" && exit 3
 		bash ~/backup3/backup.sh
 		mv "$BACKUP_CURRENT/$DST" "$SRC/$dir"
 	done
-	cp -al "$SRC/$dir" "$BACKUP_CURRENT/$DST"
+	echo remember to move last directory back to "$BACKUP_CURRENT/$DST"
 )
