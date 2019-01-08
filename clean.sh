@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/busybox ash
 #
 # Script to clean up space.
 #
@@ -22,8 +22,8 @@ NL="
 
 case "$2" in
 	( "%" )
-		total_space=$(df -B1 --output=size "$BACKUP_MAIN" | sed '1d')
-		FREE_SPACE_NEEDED=$(echo "$total_space*$1/100" | bc /dev/stdin)
+		total_space=$(df -PB1 "$BACKUP_MAIN" | awk 'FNR==2{print $2}')
+		FREE_SPACE_NEEDED=$(dc $total_space 100 / $1 \* 0 or p)
 		;;
 	( "G" )
 		FREE_SPACE_NEEDED=${1}024024024
@@ -35,8 +35,7 @@ esac
 # return status of 0 (true) means "need to clear space"
 check_space()
 {
-	free_space_available="$(df -B1 --output=avail "$BACKUP_MAIN")"
-	free_space_available="${free_space_available#*$NL}"
+	free_space_available=$(df -PB1 "$BACKUP_MAIN" | awk 'FNR==2{print $4}')
 	test "$free_space_available" -lt "$FREE_SPACE_NEEDED"
 }
 

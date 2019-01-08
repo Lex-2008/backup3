@@ -56,6 +56,7 @@ It will create necessary dirs and sqlite database to hold information.
 ### Requirements
 
 * sqlite3
+* busybox
 * flock
 * bc
 * df
