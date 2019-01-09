@@ -1,12 +1,11 @@
-#!/bin/bash
+#!/bin/busybox ash
 #
 # Main backup script.
 #
-# Note: this is *bash* script due to 2x speed improvements that variable
-# replacement like this: "${varname//a/n}" gives us over calling external
+# Note: this script should be executed by shell which understands variable
+# replacement like this: "${varname//a/n}" (it's x2 faster then calling external
 # tool like this: "$(echo "$varname" | sed 's/a/b/g')".
-# Also, we use "startswith" bashism at the end of this script:
-# if [[ "$string" == "$prefix"* ]]; then
+# Also, we use busybox because it has mkdir and ln built-ins
 
 test -z "$BACKUP_ROOT"    && exit 2
 
@@ -52,10 +51,11 @@ run_if_date_changed "%Y-%m" run_monthly
 ### DIFF ###
 
 # listing all files together with their inodes currently in backup dir
-(find "$BACKUP_CURRENT" $BACKUP_FIND_FILTER \( -type f -o -type l \) -printf '%i %P\n' ) | sort --key 2 >"$BACKUP_LIST".new
+# note that here we use "real" find, because the busybox one doesn't have "-printf"
+/usr/bin/find "$BACKUP_CURRENT" $BACKUP_FIND_FILTER \( -type f -o -type l \) -printf '%i %P\n' | sort -k 2 >"$BACKUP_LIST".new
 
 # comparing this list to its previous version
-diff --new-file "$BACKUP_LIST" "$BACKUP_LIST".new | sed '/^[<>]/!d;s/^\(.\) [0-9]*/\1/;s/^>/N/;s/^</D/' | sort --key=2 --key=1 >"$BACKUP_LIST".diff
+/usr/bin/diff -N "$BACKUP_LIST" "$BACKUP_LIST".new | sed '/^[<>]/!d;s/^\(.\) [0-9]*/\1/;s/^>/N/;s/^</D/' | sort -k 2 -k 1 >"$BACKUP_LIST".diff
 
 mv "$BACKUP_LIST".new "$BACKUP_LIST"
 touch -d "$BACKUP_TIME" "$BACKUP_LIST"
@@ -79,7 +79,7 @@ cat "$BACKUP_LIST".diff | (
 	echo "BEGIN TRANSACTION;"
 	while read change fullname; do
 		# escape vars for DB
-		clean_fullname="${fullname//\'/\'\'}"
+		clean_fullname="${fullname//'/''}"
 		clean_dirname="${clean_fullname%/*}"
 		test "$clean_dirname" = "$clean_fullname" && clean_dirname=""
 		clean_filename="${clean_fullname##*/}"
