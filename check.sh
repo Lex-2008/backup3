@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/busybox ash
 #
 # Script to check that database matches filesystem.
 #
@@ -43,9 +43,9 @@ done | $SQLITE
 
 echo "Checking current FS => DB"
 
-find "$BACKUP_CURRENT" \( -type f -o -type l \) -printf '%P\n' | while read fullname; do
+/usr/bin/find "$BACKUP_CURRENT" \( -type f -o -type l \) -printf '%P\n' | while read fullname; do
 	# escape vars for DB
-	clean_fullname="${fullname//\'/\'\'}"
+	clean_fullname="${fullname//'/''}"
 	clean_dirname="${clean_fullname%/*}"
 	test "$clean_dirname" = "$clean_fullname" && clean_dirname=""
 	clean_filename="${clean_fullname##*/}"
@@ -67,7 +67,7 @@ done | $SQLITE | fgrep -v -x 1 | (
 		mv "$BACKUP_LIST.new" "$BACKUP_LIST"
 	elif test -n "$DELETE_MISSING"; then
 		cd "$BACKUP_CURRENT"
-		tee /dev/stderr | xargs -d '\n' rm -f
+		tee /dev/stderr | tr '\n' '\0' | xargs -0 rm -f
 	else
 		cat
 	fi
@@ -78,9 +78,9 @@ echo "Checking old FS => DB"
 
 $SQLITE "CREATE INDEX IF NOT EXISTS check_old ON history(dirname, filename, created);"
 
-find "$BACKUP_MAIN" \( -type f -o -type l \) -printf '%P\n' | while read fullname; do
+/usr/bin/find "$BACKUP_MAIN" \( -type f -o -type l \) -printf '%P\n' | while read fullname; do
 	# escape vars for DB
-	clean_fullname="${fullname//\'/\'\'}"
+	clean_fullname="${fullname//'/''}"
 	clean_created="${clean_fullname##*/}"
 	clean_dirfilename="${clean_fullname%/*}"
 	clean_filename="${clean_dirfilename##*/}"
@@ -101,7 +101,7 @@ done | $SQLITE | fgrep -v -x 1 | (
 	echo "Orphan files in $BACKUP_MAIN:" >&2
 	if test -n "$DELETE_MISSING"; then
 		cd "$BACKUP_MAIN"
-		tee /dev/stderr | xargs -d '\n' rm -f
+		tee /dev/stderr | tr '\n' '\0' | xargs -0 rm -f
 	else
 		cat
 	fi
@@ -111,14 +111,16 @@ $SQLITE "DROP INDEX check_old;VACUUM;"
 
 echo "Checking current FS => old FS"
 
-find "$BACKUP_CURRENT" \( -type f -o -type l \) -printf '%i %P\n' | while read inode fullname; do
-	ls -if "$BACKUP_MAIN/$fullname" 2>/dev/null | grep -q "^$inode " || echo "$fullname"
+/usr/bin/find "$BACKUP_CURRENT" \( -type f -o -type l \) -printf '%i %P\n' | while read inode fullname; do
+	ls -i "$BACKUP_MAIN/$fullname" 2>/dev/null | grep -q "^$inode " || echo "$fullname"
 done | (
-	# TODO: if it's the same file we've already "fixed" on "current FS => DB"
-	# step, we don't need to remove it now
-	if test -n "$DELETE_MISSING"; then
+	if test -n "$FIX_MISSING"; then
 		cd "$BACKUP_CURRENT"
-		tee /dev/stderr | xargs -d '\n' rm -f
+		tee /dev/stderr | fgrep -v -f- "$BACKUP_LIST" >"$BACKUP_LIST.new"
+		mv "$BACKUP_LIST.new" "$BACKUP_LIST"
+	elif test -n "$DELETE_MISSING"; then
+		cd "$BACKUP_CURRENT"
+		tee /dev/stderr | tr '\n' '\0' | xargs -0 rm -f
 	else
 		cat
 	fi
