@@ -19,55 +19,39 @@ SQLITE="sqlite3 $BACKUP_DB"
 exec 200>"$BACKUP_FLOCK"
 flock -n 200 || exit 200
 
-test "$1" = '--fix' && FIX_MISSING=1
 test "$1" = '--delete' && DELETE_MISSING=1
 
-echo "Checking DB => FS"
+echo "Checking DB => current FS"
+
+$SQLITE "SELECT rowid, dirname, filename, created
+	FROM history
+	WHERE freq = 0
+	ORDER BY dirname;" | while IFS='|' read rowid dirname filename created; do
+	if ! test -e "$BACKUP_CURRENT/$dirname/$filename"; then
+		echo "Missing file: [$dirname][$filename][$created]" >&2
+		test -n "$DELETE_MISSING" && echo "DELETE FROM history WHERE rowid='$rowid';"
+	fi
+done | $SQLITE
+
+echo "Checking DB => old FS"
 
 $SQLITE "SELECT rowid, dirname, filename, created
 	FROM history
 	ORDER BY dirname;" | while IFS='|' read rowid dirname filename created; do
-	fullname="$dirname/$filename"
-	if test -n "$created"; then
-		newname="$BACKUP_MAIN/$dirname/$filename/$created"
-	else
-		newname="$BACKUP_CURRENT/$dirname/$filename"
-	fi
-	if ! test -e "$newname"; then
-		echo "Missing file: [$newname] [$dirname][$filename][$created]" >&2
+	if ! test -e "$BACKUP_MAIN/$dirname/$filename/$created"; then
+		echo "Missing file: [$dirname][$filename][$created]" >&2
 		test -n "$DELETE_MISSING" && echo "DELETE FROM history WHERE rowid='$rowid';"
 	fi
-	deleted=""
 done | $SQLITE
 
 
 echo "Checking current FS => DB"
 
-/usr/bin/find "$BACKUP_CURRENT" \( -type f -o -type l \) -printf '%P\n' | while read fullname; do
-	# escape vars for DB
-	clean_fullname="${fullname//'/''}"
-	clean_dirname="${clean_fullname%/*}"
-	test "$clean_dirname" = "$clean_fullname" && clean_dirname=""
-	clean_filename="${clean_fullname##*/}"
-	echo "SELECT
-		CASE
-		WHEN EXISTS(SELECT 1
-			FROM history
-			WHERE dirname='$clean_dirname'
-			  AND filename='$clean_filename'
-			  AND freq=0
-			LIMIT 1)
-		THEN 1
-		ELSE '$clean_fullname'
-		END;"
-done | $SQLITE | fgrep -v -x 1 | (
-	if test -n "$FIX_MISSING"; then
+/usr/bin/find "$BACKUP_CURRENT" \( -type f -o -type l \) -printf '%P\n' | sed '/"/d;s_^\(\(.*\)/\)\?\(.*\)$_SELECT CASE WHEN EXISTS(SELECT 1 FROM history WHERE dirname="\2" AND filename="\3" AND freq=0 LIMIT 1) THEN 1 ELSE "\2/\3" END;_' | $SQLITE | fgrep -v -x 1 | (
+	if test -n "$DELETE_MISSING"; then
 		cd "$BACKUP_CURRENT"
 		tee /dev/stderr | fgrep -v -f- "$BACKUP_LIST" >"$BACKUP_LIST.new"
 		mv "$BACKUP_LIST.new" "$BACKUP_LIST"
-	elif test -n "$DELETE_MISSING"; then
-		cd "$BACKUP_CURRENT"
-		tee /dev/stderr | tr '\n' '\0' | xargs -0 rm -f
 	else
 		cat
 	fi
@@ -78,27 +62,7 @@ echo "Checking old FS => DB"
 
 $SQLITE "CREATE INDEX IF NOT EXISTS check_old ON history(dirname, filename, created);"
 
-/usr/bin/find "$BACKUP_MAIN" \( -type f -o -type l \) -printf '%P\n' | while read fullname; do
-	# escape vars for DB
-	clean_fullname="${fullname//'/''}"
-	clean_created="${clean_fullname##*/}"
-	clean_dirfilename="${clean_fullname%/*}"
-	clean_filename="${clean_dirfilename##*/}"
-	clean_dirname="${clean_dirfilename%/*}"
-	test "$clean_dirname" = "$clean_dirfilename" && clean_dirname=""
-	echo "SELECT
-		CASE
-		WHEN EXISTS(SELECT 1
-			FROM history
-			WHERE dirname='$clean_dirname'
-			  AND filename='$clean_filename'
-			  AND created='$clean_created'
-			LIMIT 1)
-		THEN 1
-		ELSE '$clean_fullname'
-		END;"
-done | $SQLITE | fgrep -v -x 1 | (
-	echo "Orphan files in $BACKUP_MAIN:" >&2
+/usr/bin/find "$BACKUP_MAIN" \( -type f -o -type l \) -printf '%P\n' | sed '/"/d;s_^\(\(.*\)/\)\?\(.*\)/\(.*\)$_SELECT CASE WHEN EXISTS(SELECT 1 FROM history WHERE dirname="\2" AND filename="\3" AND created="\4" LIMIT 1) THEN 1 ELSE "\2/\3/\4" END;_' | $SQLITE | fgrep -v -x 1 | (
 	if test -n "$DELETE_MISSING"; then
 		cd "$BACKUP_MAIN"
 		tee /dev/stderr | tr '\n' '\0' | xargs -0 rm -f
@@ -112,15 +76,12 @@ $SQLITE "DROP INDEX check_old;VACUUM;"
 echo "Checking current FS => old FS"
 
 /usr/bin/find "$BACKUP_CURRENT" \( -type f -o -type l \) -printf '%i %P\n' | while read inode fullname; do
-	ls -i "$BACKUP_MAIN/$fullname" 2>/dev/null | grep -q "^$inode " || echo "$fullname"
+	ls -i "$BACKUP_MAIN/$fullname" 2>/dev/null | grep -q "^ *$inode " || echo "$fullname"
 done | (
-	if test -n "$FIX_MISSING"; then
+	if test -n "$DELETE_MISSING"; then
 		cd "$BACKUP_CURRENT"
 		tee /dev/stderr | fgrep -v -f- "$BACKUP_LIST" >"$BACKUP_LIST.new"
 		mv "$BACKUP_LIST.new" "$BACKUP_LIST"
-	elif test -n "$DELETE_MISSING"; then
-		cd "$BACKUP_CURRENT"
-		tee /dev/stderr | tr '\n' '\0' | xargs -0 rm -f
 	else
 		cat
 	fi
@@ -141,24 +102,25 @@ $SQLITE "SELECT a.dirname, a.filename, a.rowid, b.rowid, a.created, a.deleted, b
 	AND a.filename = b.filename
 	AND a.created < b.deleted
 	AND b.created < a.deleted;"
-	# TODO: fix?
+	# TODO: fix: set a.deleted=b.created where a.created<b.created
 
 
 echo "Checking duplicates in DB"
 
-$SQLITE "SELECT a.dirname, a.filename, a.rowid, b.rowid, a.created, a.deleted, b.created, b.deleted
-	FROM (SELECT rowid, dirname, filename, created, deleted
+$SQLITE "SELECT a.dirname, a.filename, a.rowid, b.rowid, a.created, a.deleted, a.freq, b.created, b.deleted, b.freq
+	FROM (SELECT rowid, dirname, filename, created, deleted, freq
 		FROM history
 		) AS a
-	JOIN (SELECT rowid, dirname, filename, created, deleted
+	JOIN (SELECT rowid, dirname, filename, created, deleted, freq
 		FROM history
-		WHERE freq != 0
 		) AS b
 	ON a.rowid < b.rowid
 	AND a.dirname = b.dirname
 	AND a.filename = b.filename
 	AND ( a.created = b.created
-	   OR a.deleted = b.deleted);"
+	      OR ( a.freq = 0
+	       AND b.freq = 0)
+	    );"
 	# TODO: delete
 
 
@@ -169,7 +131,7 @@ $SQLITE "SELECT *
 	WHERE created >= deleted;"
 
 
-if test -n "$FIX_MISSING"; then
+if test -n "$DELETE_MISSING"; then
 	echo "Fixing freq in DB"
 	$SQLITE "UPDATE history
 		SET freq = CASE
