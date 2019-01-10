@@ -48,6 +48,12 @@ run_if_date_changed "%F" run_daily
 run_if_date_changed "%Y %W" run_weekly
 run_if_date_changed "%Y-%m" run_monthly
 
+if test "$BACKUP_DB_BAK" != "no"; then
+	# Update inode of backup.db backup
+	touch "$BACKUP_CURRENT/$BACKUP_DB_BAK.new"
+	mv "$BACKUP_CURRENT/$BACKUP_DB_BAK.new" "$BACKUP_CURRENT/$BACKUP_DB_BAK"
+fi
+
 ### DIFF ###
 
 # listing all files together with their inodes currently in backup dir
@@ -59,13 +65,6 @@ run_if_date_changed "%Y-%m" run_monthly
 
 mv "$BACKUP_LIST".new "$BACKUP_LIST"
 touch -d "$BACKUP_TIME" "$BACKUP_LIST"
-
-if test "$BACKUP_DB_BAK" != "no"; then
-	touch "$BACKUP_CURRENT/$BACKUP_DB_BAK"
-	# Add entries to diff file required for DB backup
-	echo "D $BACKUP_DB_BAK" >>"$BACKUP_LIST".diff
-	echo "N $BACKUP_DB_BAK" >>"$BACKUP_LIST".diff
-fi
 
 ### BACKUP ###
 
