@@ -84,7 +84,7 @@ cat "$BACKUP_LIST".diff | (
 		clean_filename="${clean_fullname##*/}"
 		case "$change" in
 			( N ) # New file
-				echo "INSERT INTO history (dirname, filename, created, deleted, freq) VALUES ('$clean_dirname', '$clean_filename', '$BACKUP_TIME', NULL, 0);"
+				echo "INSERT INTO history (dirname, filename, created, deleted, freq) VALUES ('$clean_dirname', '$clean_filename', '$BACKUP_TIME', '9999-01-01 00:00', 0);"
 				mkdir -p "$BACKUP_MAIN/$fullname"
 				ln "$BACKUP_CURRENT/$fullname" "$BACKUP_MAIN/$fullname/$BACKUP_TIME"
 				;;
