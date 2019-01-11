@@ -181,30 +181,16 @@ db_dups_created ()
 
 db_dups_freq0 ()
 {
-	if test -n "$DELETE_MISSING"; then
-		echo "Deleting duplicate DB entries which still exist"
-		$SQLITE "DELETE FROM history
-			WHERE freq = 0
-			AND EXISTS (
-				SELECT *
-				FROM history AS b
-				WHERE history.rowid < b.rowid
-				AND history.dirname = b.dirname
-				AND history.filename = b.filename
-				AND b.freq = 0
-				);"
-	else
-		echo "Checking duplicate DB entries which still exist"
-		$SQLITE "SELECT *
-			FROM history AS a,
-			history AS b
-			WHERE a.freq = 0
-				AND a.rowid < b.rowid
-				AND a.dirname = b.dirname
-				AND a.filename = b.filename
-				AND b.freq = 0
-				;"
-	fi
+	echo "Checking duplicate DB entries which still exist"
+	$SQLITE "SELECT a.*, b.created
+		FROM history AS a,
+		history AS b
+		WHERE a.freq = 0
+			AND a.rowid < b.rowid
+			AND a.dirname = b.dirname
+			AND a.filename = b.filename
+			AND b.freq = 0
+			;"
 }
 
 db_freq ()
@@ -256,6 +242,7 @@ current2old
 # Tests that delete files for missing DB rows
 old2db
 
-# db_dups_freq0
+# This test should never fail
+db_dups_freq0
 
 $SQLITE "DROP INDEX IF EXISTS check_tmp;VACUUM;"
