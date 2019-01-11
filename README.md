@@ -1,7 +1,7 @@
 backup3
 =======
 
-My ~~third~~ _actually, forth_ attempt at making backups - using bash and SQLite.
+My third _and a half_ attempt at making backups - using ~~bash~~ _busybox_ and SQLite.
 
 Background
 ----------
@@ -58,8 +58,6 @@ It will create necessary dirs and sqlite database to hold information.
 * sqlite3
 * busybox
 * flock
-* bc
-* df
 
 Simple usage
 ------------
@@ -82,22 +80,17 @@ Advanced usage
 But what if you want to backup, say, your browser data every 5 minutes, and rest
 of your `$HOME` directory - only once an hour? Then use a file like this:
 
-	#!/bin/bash
+	#!/bin/busybox ash
 
 	export BACKUP_ROOT=/var/backups
 
-	# Operations to run on every backup
-	run_always()
+	run_this()
 	{
-		# Backup browser profile
-		run_rsync /home/lex/.config/google-chrome/Default/ browser
-	}
+		# Backup Chrome profile to "browser" subdir on *every* backup
+		run_rsync always browser /home/lex/.config/google-chrome/Default/
 
-	# Operations to run every hour
-	run_hourly()
-	{
-		# Backup whole home directory
-		run_rsync /home/lex home
+		# Backup whole home directory once every hour
+		run_rsync hourly home /home/lex
 	}
 
 	# Run backup operations
@@ -105,7 +98,8 @@ of your `$HOME` directory - only once an hour? Then use a file like this:
 
 Note that in last line we _source_ instead of running this script - this way we
 can ensure that `backup.sh` script will see declared functions. Also note
-hashbang in first line - `backup.sh` must be executed by bash.
+hashbang in first line - for performance reasons, `backup.sh` must be executed
+by busybox.
 
 ### Clean-up
 

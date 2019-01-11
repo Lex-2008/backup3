@@ -31,22 +31,27 @@ flock -n 200 || exit 200
 # run rsync to backup from $1 to $2, with $3 extra arguments
 run_rsync()
 {
-	rsync -a --itemize-changes --human-readable --stats --fake-super --delete --one-file-system $3 "$1" "$BACKUP_CURRENT/$2" >"$BACKUP_RSYNC_LOGS/$2"
-}
-
-# run command $1 if date (formatted as $2) have changed
-run_if_date_changed()
-{
-	command -v "${2%% *}" >/dev/null || return 0
-	test "$(date -r "$BACKUP_LIST" +"$1")" != "$(date -d "$BACKUP_TIME" +"$1")" && $2
+	when="$1"
+	to="$2"
+	from="$3"
+	shift 3
+	logfile="$BACKUP_RSYNC_LOGS/$to"
+	case "$when" in
+		( hourly )	date_fmt="%F %H" ;;
+		( daily )	date_fmt="%F" ;;
+		( weekly )	date_fmt="%Y %W" ;;
+		( monthly )	date_fmt="%Y-%m" ;;
+		( * )    	date_fmt="%F %T" ;;
+	esac
+	# test if we need to run it at all - or not enough time had passed
+	test -f "$logfile" -a "$(date -r "$logfile" +"$date_fmt")" = "$(date -d "$BACKUP_TIME" +"$date_fmt")" && return 0
+	# test if we can connect
+	timeout rsync "$@" "$from" >/dev/null 2>&1 || return 0
+	rsync -a --itemize-changes --human-readable --stats --fake-super --delete --one-file-system "$@" "$from" "$BACKUP_CURRENT/$to" >"$logfile"
 }
 
 # run
-command -v run_always >/dev/null && run_always
-run_if_date_changed "%F %H" run_hourly
-run_if_date_changed "%F" run_daily
-run_if_date_changed "%Y %W" run_weekly
-run_if_date_changed "%Y-%m" run_monthly
+command -v run_this >/dev/null && run_this
 
 if test "$BACKUP_DB_BAK" != "no"; then
 	# Update inode of backup.db backup
