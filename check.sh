@@ -70,9 +70,6 @@ current2db ()
 old2db ()
 {
 	echo "Checking old FS => DB"
-
-	$SQLITE "CREATE INDEX IF NOT EXISTS check_old ON history(dirname, filename, created);"
-
 	/usr/bin/find "$BACKUP_MAIN" \( -type f -o -type l \) -printf '%P\n' | sed '/"/d;s_^\(\(.*\)/\)\?\(.*\)/\(.*\)$_SELECT CASE WHEN EXISTS(SELECT 1 FROM history WHERE dirname="\2" AND filename="\3" AND created="\4" LIMIT 1) THEN 1 ELSE "\2/\3/\4" END;_' | $SQLITE | fgrep -v -x 1 | (
 		if test -n "$DELETE_MISSING"; then
 			cd "$BACKUP_MAIN"
@@ -81,8 +78,6 @@ old2db ()
 			cat
 		fi
 	)
-
-	$SQLITE "DROP INDEX check_old;"
 }
 
 current2old ()
@@ -165,9 +160,7 @@ db_dups_created ()
 		echo "Checking duplicate DB entries with same created"
 		operation="SELECT *"
 	fi
-	$SQLITE "BEGIN TRANSACTION;
-		CREATE INDEX IF NOT EXISTS check_fullname ON history(dirname, filename);
-		$operation FROM history
+	$SQLITE "$operation FROM history
 		WHERE EXISTS (
 			SELECT *
 			FROM history AS b
@@ -183,9 +176,7 @@ db_dups_created ()
 					AND history.rowid < b.rowid
 				)
 			)
-		);
-		DROP INDEX check_fullname;
-		END TRANSACTION;"
+		);"
 }
 
 db_dups_freq0 ()
@@ -244,6 +235,8 @@ db_freq ()
 	fi
 }
 
+$SQLITE "CREATE INDEX IF NOT EXISTS check_tmp ON history(dirname, filename, created);"
+
 # Tests that might delete some DB rows
 db_order
 db2current
@@ -265,4 +258,4 @@ old2db
 
 # db_dups_freq0
 
-$SQLITE "VACUUM;"
+$SQLITE "DROP INDEX IF EXISTS check_tmp;VACUUM;"
