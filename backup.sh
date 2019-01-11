@@ -44,7 +44,7 @@ run_rsync()
 		( * )    	date_fmt="%F %T" ;;
 	esac
 	# test if we need to run it at all - or not enough time had passed
-	test -f "$logfile" -a "$(date -r "$logfile" +"$date_fmt")" = "$(date -d "$BACKUP_TIME" +"$date_fmt")" && return 0
+	test "$(date -r "$logfile" +"$date_fmt" 2>/dev/null)" = "$(date -d "$BACKUP_TIME" +"$date_fmt")" && return 0
 	# test if we can connect
 	timeout rsync "$@" "$from" >/dev/null 2>&1 || return 0
 	rsync -a --itemize-changes --human-readable --stats --fake-super --delete --one-file-system "$@" "$from" "$BACKUP_CURRENT/$to" >"$logfile"
