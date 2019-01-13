@@ -63,10 +63,10 @@ fi
 
 # listing all files together with their inodes currently in backup dir
 # note that here we use "real" find, because the busybox one doesn't have "-printf"
-/usr/bin/find "$BACKUP_CURRENT" $BACKUP_FIND_FILTER \( -type f -o -type l \) -printf '%i %P\n' | sort >"$BACKUP_LIST".new
+/usr/bin/find "$BACKUP_CURRENT" $BACKUP_FIND_FILTER \( -type f -o -type l \) -printf '%i %P\n' | LC_ALL=POSIX sort >"$BACKUP_LIST".new
 
 # comparing this list to its previous version
-comm -3 "$BACKUP_LIST" "$BACKUP_LIST".new | sed '/^[^\t]/{s/^[0-9]*/D/};/^\t/{s/^\t[0-9]*/N/}' | sort -k 2 -k 1 >"$BACKUP_LIST".diff
+LC_ALL=POSIX comm -3 "$BACKUP_LIST" "$BACKUP_LIST".new | sed '/^[^\t]/{s/^[0-9]*/D/};/^\t/{s/^\t[0-9]*/N/}' | LC_ALL=POSIX sort -k 2 -k 1 >"$BACKUP_LIST".diff
 
 mv "$BACKUP_LIST".new "$BACKUP_LIST"
 touch -d "$BACKUP_TIME" "$BACKUP_LIST"
