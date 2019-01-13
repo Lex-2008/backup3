@@ -89,7 +89,15 @@ current2old ()
 	done | (
 		if test -n "$DELETE_MISSING"; then
 			cd "$BACKUP_CURRENT"
-			tee /dev/stderr | fgrep -v -f- "$BACKUP_LIST" >"$BACKUP_LIST.new"
+			# These files might either be in DB, or not. If they
+			# are not in DB - it was taken care of above, in
+			# `current2db`. But if they are in DB - we sholud make
+			# sure that on next run of backup.sh script they will
+			# be marked as modified. For this, we make a sed script
+			# to convert list of filenames to sed script which
+			# clears inode numbers of relevant entries in
+			# "$BACKUP_LIST", and apply it
+			sed 's/.*/s|^[0-9]* &$|0 &|;/' | sed -f /dev/stdin "$BACKUP_LIST" >"$BACKUP_LIST.new"
 			mv "$BACKUP_LIST.new" "$BACKUP_LIST"
 		else
 			cat
