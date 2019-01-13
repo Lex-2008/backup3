@@ -96,9 +96,10 @@ current2old ()
 			# be marked as modified. For this, we make a sed script
 			# to convert list of filenames to sed script which
 			# clears inode numbers of relevant entries in
-			# "$BACKUP_LIST", and apply it
+			# "$BACKUP_LIST", and apply it. After that we must sort
+			# "$BACKUP_LIST" file again
 			sed 's/.*/s|^[0-9]* &$|0 &|;/' | sed -f /dev/stdin "$BACKUP_LIST" >"$BACKUP_LIST.new"
-			mv "$BACKUP_LIST.new" "$BACKUP_LIST"
+			sort "$BACKUP_LIST.new" >"$BACKUP_LIST"
 		else
 			cat
 		fi
