@@ -30,8 +30,7 @@ done | $SQLITE | sed "s/'/''/g;" | (
 	echo "BEGIN TRANSACTION;"
 	while IFS='|' read dirname filename old_created new_created; do
 		# Remove old file
-		# echo rm -f "$dirname/$filename/$new_created" >&2
-		rm -f "$dirname/$filename/$new_created"
+		rm -f "$BACKUP_MAIN/$dirname/$filename/$new_created"
 		# SQL query to update database
 		echo "UPDATE history
 				SET deleted=(SELECT deleted
