@@ -99,7 +99,7 @@ current2old ()
 			# "$BACKUP_LIST", and apply it. After that we must sort
 			# "$BACKUP_LIST" file again
 			sed 's/.*/s|^[0-9]* &$|0 &|;/' | sed -f /dev/stdin "$BACKUP_LIST" >"$BACKUP_LIST.new"
-			sort "$BACKUP_LIST.new" >"$BACKUP_LIST"
+			LC_ALL=POSIX sort "$BACKUP_LIST.new" >"$BACKUP_LIST"
 		else
 			cat
 		fi
