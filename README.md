@@ -200,3 +200,26 @@ stackexchange answer):
 	find $BACKUP_MAIN -type d -empty -delete
 
 [a]: https://unix.stackexchange.com/questions/8430/how-to-remove-all-empty-directories-in-a-subtree/107556#107556
+
+### Removing duplicates
+
+If you have rdfind installed, you can use these commands to hardlink similar files
+to each other:
+
+	cd "$BACKUP_ROOT"
+	rdfind -ignoreempty false -removeidentinode false -makehardlinks true current data
+	find current \( -type f -o -type l \) -printf '%i %P\n' | LC_ALL=POSIX sort >files.txt
+
+Last command updates files.txt with inodes of new files. Note, however, that
+above command changes timestamps of some files in "current" backup dir, so
+rsync still will overwrite them on next run, creating new duplicates. More clean
+command (which checks only copies of same files) is like this:
+
+	cd "$BACKUP_ROOT"
+	(cd current/ && find -type f -print0) | xargs -0 -I% rdfind -ignoreempty false -removeidentinode false -makehardlinks true -makeresultsfile false current/% data/% >/dev/null
+
+It runs `rdfind` multiple times, once for each file in "current" backup dir,
+checking for duplicates among copies of this file.
+
+After that, you can also run `dedup.sh` script which remove duplicate hardlinks
+for consecutive DB entries
