@@ -1,7 +1,7 @@
 backup3
 =======
 
-My third _and a half_ attempt at making backups - using ~~bash~~ _busybox_ and SQLite.
+My third _and a half_ attempt at making backups - using ~~bash~~ _busybox_, ~find~ _comm -3_, and SQLite.
 
 Background
 ----------
@@ -26,12 +26,12 @@ So the idea is to keep only _one_ copy of each unique file, plus keep _somewhere
 So it work like this:
 
 * First, rsync updates all files in a "current backup" directory.
-  By default it doesn't do it "in place" - instead, it first creates new version and then replaces old one with it, so its inode number changes.
-  Note this, we will use it later.
+  By default it doesn't do it "in place" - instead, it first creates new version and then replaces old one with it, so _its inode number changes_.
+  Note this! We will use it later.
 
 * Then, we compare current state of "current backup" dir with what was there previously:
 
-  * New files we hardlink to "storage" directory (so they didn't get lost if deleted from "current backup"),
+  * New files we hardlink to "storage" directory (so they didn't get lost when deleted from "current backup" some day later),
     and record them into database, together with "creation" date.
 
   * For deleted files we just note their "deletion" date in the database.
@@ -40,9 +40,14 @@ So it work like this:
 
 #### How do we compare?
 
-To notice changes in new and deleted files, we can just save list of all files, like this: `find -type f >files.list.new` and run `diff` to compare it to previous version.
-Then new files will appear in diff marked with `>` symbol, and deleted - with `<`.
-To track also changed files, we actually need to record inode number together with filename - in case it's modified by rsync (remember that rsync changes inode number when modifying files), line if `find` output will change, and `diff` output will have two lines - one for "deletion" of old line, and one for "addition" of new one - exactly what we want!
+To notice changes in new and deleted files, we can just save list of all files, like this: `find -type f >files.list.new` ~and run `diff` to compare it to previous version~.
+Then new files will appear in diff marked with `>` symbol, and deleted - with `<`.~
+
+Update: `diff` sometimes gets confused when many lines get changed, and reports not-changed files as both created and deleted.
+I've moved to `comm -3` utility since then - when comparing two files, it prefixes lines unique to second file with tab character, and (due to `-3` argument) skips lines which present in both files.
+Lines unique to first file are printed not-tab-indented.
+
+To track also changed files, we actually need to record inode number together with filename - in case it's modified by rsync (remember that rsync changes inode number when modifying files), line if `find` output will change, and `comm -3` output will have two lines - one for "deletion" of old line, and one for "addition" of new one - exactly what we want!
 
 Setup
 -----
@@ -56,7 +61,8 @@ It will create necessary dirs and sqlite database to hold information.
 ### Requirements
 
 * sqlite3
-* busybox
+* busybox (ash, du, df)
+* find
 * flock
 
 Simple usage
@@ -177,7 +183,7 @@ synchronize DB with FS.
 If you realised that you've backed up some files that you didn't actually want
 to backup (like caches), you can delete them - both from filesystem, like this:
 
-	rm -rf $BACKUP_DATA/home/.cache
+	rm -rf $BACKUP_ROOT/data/home/.cache
 
 and from database, like this:
 
