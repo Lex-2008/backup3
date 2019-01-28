@@ -117,7 +117,7 @@ above file:
 
 ### Restore from backup
 
-You can either dig manually in data dir, or use `flat.sh` to show contents of
+You can either dig manually in data dir, or use `show.sh` to show contents of
 archive for a given date.
 
 Fun stuff
