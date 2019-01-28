@@ -203,8 +203,8 @@ stackexchange answer):
 
 ### Removing duplicates
 
-If you have rdfind installed, you can use these commands to hardlink similar files
-to each other:
+If you have rdfind installed, you might want to use these commands to hardlink
+similar files to each other:
 
 	cd "$BACKUP_ROOT"
 	rdfind -ignoreempty false -removeidentinode false -makehardlinks true current data
@@ -212,8 +212,12 @@ to each other:
 
 Last command updates files.txt with inodes of new files. Note, however, that
 above command changes timestamps of some files in "current" backup dir, so
-rsync still will overwrite them on next run, creating new duplicates. More clean
-command (which checks only copies of same files) is like this:
+rsync still will overwrite them on next run, creating new duplicates. Moreover,
+it might hardlink together files in "current" dir which have same contents but
+different permissions. As a result, _each_ following rsync run will flip their
+permissions.
+
+More clean command (which checks only copies of same files) is like this:
 
 	cd "$BACKUP_ROOT"
 	(cd current/ && find -type f -print0) | xargs -0 -I% rdfind -ignoreempty false -removeidentinode false -makehardlinks true -makeresultsfile false current/% data/% >/dev/null
@@ -221,5 +225,5 @@ command (which checks only copies of same files) is like this:
 It runs `rdfind` multiple times, once for each file in "current" backup dir,
 checking for duplicates among copies of this file.
 
-After that, you can also run `dedup.sh` script which remove duplicate hardlinks
-for consecutive DB entries
+After that, it is recommended to run `dedup.sh` script which remove duplicate
+hardlinks for consecutive DB entries.
