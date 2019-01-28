@@ -65,6 +65,9 @@ fi
 # note that here we use "real" find, because the busybox one doesn't have "-printf"
 /usr/bin/find "$BACKUP_CURRENT" $BACKUP_FIND_FILTER \( -type f -o -type l \) -printf '%i %P\n' | LC_ALL=POSIX sort >"$BACKUP_LIST".new
 
+# Add empty file if it's missing so comm doesn't complain
+touch "$BACKUP_LIST"
+
 # comparing this list to its previous version
 LC_ALL=POSIX comm -3 "$BACKUP_LIST" "$BACKUP_LIST".new | sed '/^[^\t]/{s/^[0-9]*/D/};/^\t/{s/^\t[0-9]*/N/}' | LC_ALL=POSIX sort -k 2 -k 1 >"$BACKUP_LIST".diff
 

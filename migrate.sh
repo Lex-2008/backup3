@@ -13,8 +13,8 @@
 
 if test "$1" = "--files"; then
 	shift
-	ls -d "$@" | sed -r 's_(.*)/(.*)_\1 \2_' | sort -k 2 | uniq -f 1 | sed 's_(.*) (.*)_\1/\2_'
-	exit
+	ls -d "$@" | sed -r 's_(.*)/(.*)_\1 \2_' | sort -k 2 | uniq -f 1 | sed -r 's_(.*) (.*)_\1/\2_'
+	exit 0
 fi
 
 test -z "$BACKUP_ROOT"    && exit 2
@@ -28,14 +28,15 @@ files="$1"
 DST="$2"
 
 while read dir; do
-	test -f "$files.stop"
+	test -d "$dir" || continue
+	test -f "$files.stop" && exit 1
 	echo "no $files.stop file, moving on!"
 	time="${dir%/}"
 	time="${time##*/}"
 	export BACKUP_TIME="$(date -d "$(echo "$time" | sed -r 's/_/ /;s/(.*)-(.*)-(.*)/\1:\2:\3/')" +"%F %H:%M")"
 	echo "processing [$BACKUP_TIME] from [$dir]..."
 	mv "$dir" "$BACKUP_CURRENT/$DST"
-	bash ~/backup3/backup.sh
+	~/backup3/backup.sh
 	mv "$BACKUP_CURRENT/$DST" "$dir"
 done <"$files"
 echo remember to move last directory back to "$BACKUP_CURRENT/$DST"
