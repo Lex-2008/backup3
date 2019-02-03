@@ -1,9 +1,28 @@
 $=(x)=>document.querySelector(x);
 
-getText=(url)=>fetch(url).then(a=>a.text());
+api=(params, returnBlob)=>{
+	var url=params;
+	return fetch(`/cgi-bin/api.sh?${pass}|${params}`).then(a=>{
+		if(a.status==403){
+			// ask for a password
+			if(pass=prompt('password?',pass)){
+				// retry with a new password
+				return api(url);
+			} else {
+				// abort
+				Promise.reject('bad pass');
+			}
+		} else if(returnBlob) {
+			return a.blob();
+		} else {
+			return a.text();
+		}
+	});
+}
 
 backups=[];
 timeline=[];
+pass='';
 path='';
 time='';
 file='';
@@ -42,7 +61,8 @@ addDir=(dirname, created, deleted)=>{
 
 // fill list of backups (in top-left corner) and backups global var
 fillBackups=()=>{
-	getText('/cgi-bin/api.sh?init').then(a=>{
+	pass='';
+	api('init').then(a=>{
 		backups=a.trim().split('\n').filter(a=>a.endsWith('/')).map(a=>a.slice(0,-1));
 		$('.backups select').innerHTML=backups.map((a)=>`<option>${a}</option>`).join('');
 		$('.backups select').onchange=function(){
@@ -112,12 +132,9 @@ window.onhashchange=()=>{
 	}
 }
 
-// TODO: fill dirlist, too
-// TODO: check for pass
-
 // fill timeline input (top right corner) and timeline global var
 fillTimeline=(backup)=>{
-	getText(`/cgi-bin/api.sh?timeline||${backup}`).then(a=>{
+	api(`timeline|${backup}`).then(a=>{
 		var data=a.split('\n').filter(a=>!!a);
 		var idx1=data.indexOf('---');
 		var idx2=data.indexOf('===');
@@ -224,7 +241,7 @@ render=()=>{
 			`<a href="#${a.slice(0,i+1).join('/')}|${time}">${decodeURIComponent(v)}</a>`
 			).join('/');
 	// $('#tar').href='/cgi-bin/tar.cgi?'+time+path;
-	getText(`/cgi-bin/api.sh?ls||${path}|${time}`).then(a=>{
+	api(`ls|${path}|${time}`).then(a=>{
 		$('#here').innerHTML=(
 					// add dirs first
 					Object.keys(dirtree[path].children).filter(a=>{
@@ -243,7 +260,7 @@ render=()=>{
 	});
 	if(file){
 		if(file_time){
-			getFile(`/cgi-bin/api.sh?get||${path}|${file_time}|${file}`,file);
+			getFile(`get|${path}|${file_time}|${file}`,file);
 			if(window.history.length>1){
 				window.history.back();
 			} else {
@@ -259,7 +276,7 @@ render=()=>{
 }
 
 fileDetails=(name)=>{
-	getText(`/cgi-bin/api.sh?ll||${path}||${name}`).then(a=>{
+	api(`ll|${path}||${name}`).then(a=>{
 		$('#file_list').innerHTML=a.split('\n').filter(a=>!!a).map(a=>a.split('|')).map(a=>
 				`<tr><td><a href="#${path}|${time}|${name}|${a[0]}">${name}</a></td><td>${a[0]}</td><td>${a[1].startsWith('9999')?' ':a[1]}</td></tr>`
 				).join('');
@@ -271,8 +288,8 @@ closeFileDetails=()=>{
 	location.hash=`#${path}|${time}`;
 }
 
-getFile=(url, name)=>{
-	fetch(url).then(a=>a.blob()).then(b=>{
+getFile=(params, name)=>{
+	api(params, true).then(b=>{
 		// createAndDownloadBlobFile(arrayBuffer, 'testName');
 		// from https://medium.com/@riccardopolacci/download-file-in-javascript-from-bytea-6a0c5bb3bbdb
 		var link = document.createElement('a');

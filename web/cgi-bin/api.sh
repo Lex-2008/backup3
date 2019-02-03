@@ -19,7 +19,7 @@ SQLITE="sqlite3 $BACKUP_DB"
 #      get|pass|dir|date|file
 #       ll|pass|dir|*|file
 
-if test "$QUERY_STRING" = "init"; then
+if test "$QUERY_STRING" = "|init"; then
 	echo "HTTP/1.0 200 OK"
 	echo "Cache-Control: max-age=600"
 	echo
@@ -27,13 +27,14 @@ if test "$QUERY_STRING" = "init"; then
 	exit 0
 fi
 
-IFS='|' read request pass dir date file <<EOL
+IFS='|' read -r pass request dir date file <<EOL
 $(busybox httpd -d "$QUERY_STRING")
 EOL
 
 # TODO
 # # protect agains hacks like 'asd/../../../../'
-# # doesn't work if ROOT start with /
+# # also protect against accessing password-protected dirs via 'public/../private/..'
+# # maybe match for '(^|/)..(/|$)' would be enough?
 # file="$(realpath --no-symlinks -m "$PWD/$request")"
 # if [ "$(expr substr "$file" 1 ${#PWD})" != "$PWD" ]; then
 # # if [ "${file:0:${#PWD}}" != "$PWD" ]; then
@@ -48,13 +49,13 @@ root="${dir%%/*}"
 
 # check root-pass by trying to SMB into requested share
 if test -f "$BACKUP_CURRENT/$root.pw"; then
-	IFS='|' read user share <"$BACKUP_CURRENT/$root.pw"
-	if ! smbclient -U "$user" -N -c exit "$share" "$pass" >/dev/null 2>&1; then
+	IFS='|' read -r user share <"$BACKUP_CURRENT/$root.pw"
+	if ! smbclient -U "$user" -c exit "$share" "$pass" >/dev/null 2>&1; then
 		echo "HTTP/1.0 403 Forbidden"
 		echo
 		echo "$BACKUP_CURRENT/$root.pw"
 		cat  "$BACKUP_CURRENT/$root.pw"
-		echo smbclient -U "$user" -N -c exit "$share" "$pass"
+		echo smbclient -U "$user" -c exit "$share" "$pass"
 		exit 1
 	fi
 fi
