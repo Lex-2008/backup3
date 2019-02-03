@@ -6,6 +6,7 @@ test -z "$BACKUP_ROOT"    && exit 2
 
 test -z "$BACKUP_CURRENT" && BACKUP_CURRENT=$BACKUP_ROOT/current
 test -z "$BACKUP_MAIN"    && BACKUP_MAIN=$BACKUP_ROOT/data
+test -z "$BACKUP_SHOW"    && BACKUP_SHOW=$BACKUP_ROOT/show
 test -z "$BACKUP_PASS"    && BACKUP_PASS=$BACKUP_ROOT/pass.txt
 test -z "$BACKUP_DB"      && BACKUP_DB=$BACKUP_ROOT/backup.db
 
@@ -102,8 +103,19 @@ case "$request" in
 			  AND deleted > '$date';"
 	;;
 	(tar)
-		echo "HTTP/1.0 501 Not Implemented"
-		# run show.sh and tar results
+		export BACKUP_ROOT BACKUP_MAIN BACKUP_DB
+		# TODO: mktmp
+		filename="$(basename "$BACKUP_SHOW/$dir")"
+		echo "HTTP/1.0 200 OK"
+		echo "Cache-Control: max-age=3600"
+		echo "Content-Disposition: attachment; filename=\"$(basename "$filename").tar\""
+		# https://lists.gnu.org/archive/html/bug-tar/2007-01/msg00013.html
+		~/git/backup3/show.sh "$date" "$dir" "$BACKUP_SHOW"
+		echo -n "Content-Length: "
+		/bin/tar --create --ignore-failed-read --one-file-system --preserve-permissions --sparse -C "$BACKUP_SHOW/$dir/.." "$filename" --totals --file=/dev/null 2>&1 | sed '/Total bytes written/!d;s/.*: \([0-9]*\) (.*/\1/'
+		echo
+		/bin/tar --create --ignore-failed-read --one-file-system --preserve-permissions --sparse -C "$BACKUP_SHOW/$dir/.." "$filename"
+		rm -rf "$BACKUP_SHOW"
 	;;
 	(get)
 		echo "HTTP/1.0 200 OK"

@@ -240,7 +240,6 @@ render=()=>{
 	$('#path').innerHTML=path.split('/').map((v,i,a)=>
 			`<a href="#${a.slice(0,i+1).join('/')}|${time}">${decodeURIComponent(v)}</a>`
 			).join('/');
-	// $('#tar').href='/cgi-bin/tar.cgi?'+time+path;
 	api(`ls|${path}|${time}`).then(a=>{
 		$('#here').innerHTML=(
 					// add dirs first
@@ -306,6 +305,8 @@ getFile=(params, name)=>{
 $('#file_group').onclick=$('#file_close').onclick=closeFileDetails;
 
 $('#file_dl').onclick=$('#file_show').onclick=render;
+
+$('#tar').onclick=()=>getFile(`tar|${path}|${time}`,path.replace(/.*[\/]/,'')+'.tar');
 
 // INIT
 fillBackups();
