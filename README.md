@@ -61,9 +61,11 @@ It will create necessary dirs and sqlite database to hold information.
 ### Requirements
 
 * sqlite3
-* busybox (ash, du, df)
+* busybox (ash, du, df, also httpd for [WebUI](#webui))
 * find
 * flock
+* smbclient (if using password-protected dirs in WebUI)
+
 
 Simple usage
 ------------
@@ -118,7 +120,47 @@ above file:
 ### Restore from backup
 
 You can either dig manually in data dir, or use `show.sh` to show contents of
-archive for a given date.
+archive for a given date, or read next big chapter:
+
+Web UI
+------
+
+Go to the `web` dir of this repo and run the following command:
+
+	busybox httpd -p 8800
+
+Then navigate to <http://localhost:8800/> in your browser and you can browse
+through contents of your backups:
+
+![Main screen](Screenshot_2019-02-03-main.png)
+
+First, select "root" backup dir in top-left corner, then navigate through
+directories to the place of interest, use time slider in top-right corner
+to select desired time of backup, and after that you have three options:
+
+* Either click one of files to download its version for a given time
+
+* Or click button in top row to download whole directory
+
+* Or change value of switch in top row to show all versions of file instead of
+downloading it and click any of file names - you will see a screen where you
+can choose which version of the file you want to restore:
+
+![File info dialog](Screenshot_2019-02-03-fileinfo.png)
+
+### Password protection
+
+Password protection currently implemented via attempt to connect to samba share.
+To protect, for example, "root" directory called "private", create text file
+`private.pw` next to it with name of user and share, like this:
+
+	lex|\\localhost\private\
+
+This way, when accessing anything in "private" dir, we will try to access
+`\\localhost\private\` share using `lex` username and user-provided password.
+Note that you need to have `smbclient` installed for this to work.
+To override default username, user can provide username in password field,
+space-separated before password, like this: `username password`.
 
 Fun stuff
 ---------
