@@ -134,6 +134,8 @@ window.onhashchange=()=>{
 
 // fill timeline input (top right corner) and timeline global var
 fillTimeline=(backup)=>{
+	// reset pass
+	pass='';
 	api(`timeline|${backup}`).then(a=>{
 		var data=a.split('\n').filter(a=>!!a);
 		var idx1=data.indexOf('---');
@@ -221,6 +223,7 @@ fillTimeline=(backup)=>{
 
 		};
 		timeline=freqtimes.filter((x,i,a)=>a.indexOf(x)==i).sort().filter(shouldBeAdded);
+		dirtree={};
 		data.slice(idx3+1).forEach(a=>{
 			a=a.split('|');
 			addDir(a[0],a[1],a[2]);
@@ -240,6 +243,16 @@ render=()=>{
 	$('#path').innerHTML=path.split('/').map((v,i,a)=>
 			`<a href="#${a.slice(0,i+1).join('/')}|${time}">${decodeURIComponent(v)}</a>`
 			).join('/');
+	if(pass){
+		// show tar-btn
+		$('#tar-lnk').style.display='none';
+		$('#tar-btn').style.display='';
+	} else {
+		// show tar-lnk
+		$('#tar-btn').style.display='none';
+		$('#tar-lnk').style.display='';
+		$('#tar-lnk').href=`/cgi-bin/api.sh?|tar|${path}|${time}`;
+	}
 	api(`ls|${path}|${time}`).then(a=>{
 		$('#here').innerHTML=(
 					// add dirs first
@@ -251,9 +264,13 @@ render=()=>{
 						a.split('\n').filter(a=>!!a).map(a=>a.split('|')).map(a=>
 							`<a class="file" href="#${path}|${time}|${a[0]}">${a[0]}</a>`
 						).join('')
-					):(
+					):pass?(
 						a.split('\n').filter(a=>!!a).map(a=>a.split('|')).map(a=>
 							`<a class="file" href="#${path}|${time}|${a[0]}|${a[1]}">${a[0]}</a>`
+						).join('')
+				       ):(
+						a.split('\n').filter(a=>!!a).map(a=>a.split('|')).map(a=>
+							`<a class="file" href="/cgi-bin/api.sh?|get|${path}|${a[1]}|${a[0]}">${a[0]}</a>`
 						).join('')
 				));
 	});
@@ -306,7 +323,7 @@ $('#file_group').onclick=$('#file_close').onclick=closeFileDetails;
 
 $('#file_dl').onclick=$('#file_show').onclick=render;
 
-$('#tar').onclick=()=>getFile(`tar|${path}|${time}`,path.replace(/.*[\/]/,'')+'.tar');
+$('#tar-btn').onclick=()=>getFile(`tar|${path}|${time}`,path.replace(/.*[\/]/,'')+'.tar');
 
 // INIT
 fillBackups();
