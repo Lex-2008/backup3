@@ -51,11 +51,17 @@ root="${dir%%/*}"
 # check root-pass by trying to SMB into requested share
 if test -f "$BACKUP_CURRENT/$root.pw"; then
 	IFS='|' read -r user share <"$BACKUP_CURRENT/$root.pw"
+	if expr index "$pass" ' ' >/dev/null; then
+		IFS=' ' read -r user pass <<EOL
+$pass
+EOL
+	fi
 	if ! smbclient -U "$user" -c exit "$share" "$pass" >/dev/null 2>&1; then
 		echo "HTTP/1.0 403 Forbidden"
 		echo
 		echo "$BACKUP_CURRENT/$root.pw"
 		cat  "$BACKUP_CURRENT/$root.pw"
+		echo "[$user][$pass][$share]"
 		echo smbclient -U "$user" -c exit "$share" "$pass"
 		exit 1
 	fi

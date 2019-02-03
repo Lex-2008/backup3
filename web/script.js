@@ -5,7 +5,7 @@ api=(params, returnBlob)=>{
 	return fetch(`/cgi-bin/api.sh?${pass}|${params}`).then(a=>{
 		if(a.status==403){
 			// ask for a password
-			if(pass=prompt('password?',pass)){
+			if(pass=prompt('[username] password',pass)){
 				// retry with a new password
 				return api(url);
 			} else {
