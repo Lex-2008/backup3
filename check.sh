@@ -208,10 +208,11 @@ db_freq ()
 		echo "Fixing freq in DB"
 		$SQLITE "UPDATE history
 			SET freq = CASE
-				WHEN substr(created, 1, 7) != substr(deleted, 1, 7) THEN 1 -- different month
-				WHEN strftime('%Y %W', created) != strftime('%Y %W', deleted) THEN 5 -- different week
-				WHEN substr(created, 1, 10) != substr(deleted, 1, 10) THEN 30 -- different day
-				WHEN substr(created, 1, 13) != substr(deleted, 1, 13) THEN 720 -- different hour
+				WHEN substr(created, 1, 7) != substr(deleted, 1, 7) OR created LIKE '%-01 00:00' THEN 1 -- different month
+				WHEN strftime('%Y %W', created) != strftime('%Y %W', deleted) OR
+					created LIKE '% 00:00' AND strftime('%w', created) ='1' THEN 5 -- different week
+				WHEN substr(created, 1, 10) != substr(deleted, 1, 10) OR created LIKE '% 00:00' THEN 30 -- different day
+				WHEN substr(created, 1, 13) != substr(deleted, 1, 13) OR created LIKE '%:00' THEN 720 -- different hour
 				ELSE 8640
 			END
 			WHERE freq != 0;"
@@ -221,10 +222,11 @@ db_freq ()
 			FROM history
 			WHERE freq != 0 AND
 			freq != CASE
-				WHEN substr(created, 1, 7) != substr(deleted, 1, 7) THEN 1 -- different month
-				WHEN strftime('%Y %W', created) != strftime('%Y %W', deleted) THEN 5 -- different week
-				WHEN substr(created, 1, 10) != substr(deleted, 1, 10) THEN 30 -- different day
-				WHEN substr(created, 1, 13) != substr(deleted, 1, 13) THEN 720 -- different hour
+				WHEN substr(created, 1, 7) != substr(deleted, 1, 7) OR created LIKE '%-01 00:00' THEN 1 -- different month
+				WHEN strftime('%Y %W', created) != strftime('%Y %W', deleted) OR
+					created LIKE '% 00:00' AND strftime('%w', created) ='1' THEN 5 -- different week
+				WHEN substr(created, 1, 10) != substr(deleted, 1, 10) OR created LIKE '% 00:00' THEN 30 -- different day
+				WHEN substr(created, 1, 13) != substr(deleted, 1, 13) OR created LIKE '%:00' THEN 720 -- different hour
 				ELSE 8640
 			END;"
 	fi
