@@ -101,15 +101,19 @@ cat "$BACKUP_LIST".diff | (
 					SET
 						deleted = '$BACKUP_TIME',
 						freq = CASE
-						WHEN substr(created, 1, 7) != substr('$BACKUP_TIME', 1, 7) OR
-							created LIKE '%-01 00:00' THEN 1 -- different month
-						WHEN strftime('%Y %W', created) != strftime('%Y %W', '$BACKUP_TIME') OR
-							created LIKE '% 00:00' AND strftime('%w', created) ='1' THEN 5 -- different week
-						WHEN substr(created, 1, 10) != substr('$BACKUP_TIME', 1, 10) OR
-							created LIKE '% 00:00' THEN 30 -- different day
-						WHEN substr(created, 1, 13) != substr('$BACKUP_TIME', 1, 13) OR
-							created LIKE '%:00' THEN 720 -- different hour
-						ELSE 8640
+							WHEN strftime('%Y-%m', created,        '-1 minute') !=
+							     strftime('%Y-%m', '$BACKUP_TIME', '-1 minute')
+							     THEN 1 -- different month
+							WHEN strftime('%Y %W', created,        '-1 minute') !=
+							     strftime('%Y %W', '$BACKUP_TIME', '-1 minute')
+							     THEN 5 -- different week
+							WHEN strftime('%Y-%m-%d', created,        '-1 minute') !=
+							     strftime('%Y-%m-%d', '$BACKUP_TIME', '-1 minute')
+							     THEN 30 -- different day
+							WHEN strftime('%Y-%m-%d %H', created,        '-1 minute') !=
+							     strftime('%Y-%m-%d %H', '$BACKUP_TIME', '-1 minute')
+							     THEN 720 -- different hour
+							ELSE 8640
 						END
 					WHERE dirname = '$clean_dirname'
 					AND filename = '$clean_filename'

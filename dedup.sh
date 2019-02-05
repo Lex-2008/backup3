@@ -48,12 +48,18 @@ done | $SQLITE | sed "s/'/''/g;" | (
 				AND created='$new_created';
 			UPDATE history
 				SET freq = CASE
-					WHEN deleted > '3000' THEN 0
-					WHEN substr(created, 1, 7) != substr(deleted, 1, 7) OR created LIKE '%-01 00:00' THEN 1 -- different month
-					WHEN strftime('%Y %W', created) != strftime('%Y %W', deleted) OR
-						created LIKE '% 00:00' AND strftime('%w', created) ='1' THEN 5 -- different week
-					WHEN substr(created, 1, 10) != substr(deleted, 1, 10) OR created LIKE '% 00:00' THEN 30 -- different day
-					WHEN substr(created, 1, 13) != substr(deleted, 1, 13) OR created LIKE '%:00' THEN 720 -- different hour
+					WHEN strftime('%Y-%m', created, '-1 minute') !=
+					     strftime('%Y-%m', deleted, '-1 minute')
+					     THEN 1 -- different month
+					WHEN strftime('%Y %W', created, '-1 minute') !=
+					     strftime('%Y %W', deleted, '-1 minute')
+					     THEN 5 -- different week
+					WHEN strftime('%Y-%m-%d', created, '-1 minute') !=
+					     strftime('%Y-%m-%d', deleted, '-1 minute')
+					     THEN 30 -- different day
+					WHEN strftime('%Y-%m-%d %H', created, '-1 minute') !=
+					     strftime('%Y-%m-%d %H', deleted, '-1 minute')
+					     THEN 720 -- different hour
 					ELSE 8640
 				END
 				WHERE dirname='$dirname'
