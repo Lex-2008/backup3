@@ -210,11 +210,11 @@ fillTimeline=(backup)=>{
 			} // switch
 		});
 		var changesCache={};
-		var shouldBeAdded=(time,indx)=>{
+		var shouldBeAdded=(time,indx,array)=>{
 			if(alltimes.indexOf(a)!=-1 || indx==0){
 				return true;
 			}
-			var prev=timeline[indx-1];
+			var prev=array[indx-1];
 			if(!changesCache[prev]){
 				changesCache[prev]=alltimes.filter(a=>a<=prev).length;
 			}
