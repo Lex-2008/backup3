@@ -137,7 +137,7 @@ case "$request" in
 		echo "HTTP/1.0 200 OK"
 		echo "Cache-Control: max-age=600"
 		echo
-		$SQLITE "SELECT created, deleted
+		$SQLITE "SELECT created, deleted, freq
 			FROM history
 			WHERE dirname = '$dir'
 			  AND filename = '$file';"
