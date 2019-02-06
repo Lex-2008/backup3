@@ -145,6 +145,7 @@ fillTimeline=(backup)=>{
 		var deleted=data.slice(idx1+1,idx2);
 		var alltimes=created.concat(deleted).filter((x,i,a)=>a.indexOf(x)==i);
 		var freqtimes=[];
+		var ticks=[];
 		data.slice(idx2+1,idx3).map(a=>a.split('|')).forEach(a=>{
 			var e=a[1].match(/^([0-9]*)-([0-9]*)-([0-9]*) ([0-9]*):([0-9]*)$/);
 			var d=e.map(a=>parseInt(a));
@@ -154,6 +155,8 @@ fillTimeline=(backup)=>{
 				case '1':
 					// add 1st of every month
 					d[2]++;
+					var day=new Date(Date.UTC(d[1],d[2]-1,1));
+					ticks.push(day.toISOString().slice(0, 16).replace('T',' '));
 					while(true){
 						var day=new Date(Date.UTC(d[1],d[2]-1,1));
 						if(day>now) break;
@@ -169,6 +172,8 @@ fillTimeline=(backup)=>{
 						if(day.getDay()==1) break;
 						d[3]++;
 					}
+					var day=new Date(Date.UTC(d[1],d[2]-1,d[3]));
+					ticks.push(day.toISOString().slice(0, 16).replace('T',' '));
 					while(true){
 						// add every 7th day (Monday)
 						var day=new Date(Date.UTC(d[1],d[2]-1,d[3]));
@@ -179,6 +184,8 @@ fillTimeline=(backup)=>{
 					break;
 				case '30':
 					d[3]++;
+					var day=new Date(Date.UTC(d[1],d[2]-1,d[3]));
+					ticks.push(day.toISOString().slice(0, 16).replace('T',' '));
 					while(true){
 						// add every day (midnight)
 						var day=new Date(Date.UTC(d[1],d[2]-1,d[3]));
@@ -189,6 +196,8 @@ fillTimeline=(backup)=>{
 					break;
 				case '720':
 					d[4]++;
+					var day=new Date(Date.UTC(d[1],d[2]-1,d[3], d[4]));
+					ticks.push(day.toISOString().slice(0, 16).replace('T',' '));
 					while(true){
 						// add every hour
 						var day=new Date(Date.UTC(d[1],d[2]-1,d[3], d[4]));
@@ -199,6 +208,8 @@ fillTimeline=(backup)=>{
 					break;
 				default:
 					d[5]+=5;
+					var day=new Date(Date.UTC(d[1],d[2]-1,d[3], d[4],d[5]));
+					ticks.push(day.toISOString().slice(0, 16).replace('T',' '));
 					while(true){
 						// add every 5 minutes
 						var day=new Date(Date.UTC(d[1],d[2]-1,d[3], d[4],d[5]));
@@ -223,6 +234,8 @@ fillTimeline=(backup)=>{
 
 		};
 		timeline=freqtimes.filter((x,i,a)=>a.indexOf(x)==i).sort().filter(shouldBeAdded);
+		ticks.push(timeline[timeline.length-1]);
+		$('#marks').innerHTML=ticks.map(a=>timeline.indexOf(a)).filter(a=>a!=-1).map(a=>`<option value="${a}">`).join('\n');
 		dirtree={};
 		data.slice(idx3+1).forEach(a=>{
 			a=a.split('|');
