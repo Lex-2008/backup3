@@ -143,7 +143,7 @@ fillTimeline=(backup)=>{
 		var idx3=data.indexOf('+++');
 		var created=data.slice(0,idx1);
 		var deleted=data.slice(idx1+1,idx2);
-		var alltimes=created.concat(deleted).filter((x,i,a)=>a.indexOf(x)==i);
+		var changes=created.concat(deleted).sort();
 		var freqtimes=[];
 		var ticks=[];
 		data.slice(idx2+1,idx3).map(a=>a.split('|')).forEach(a=>{
@@ -220,22 +220,19 @@ fillTimeline=(backup)=>{
 					break;
 			} // switch
 		});
-		var changesCache={};
-		var shouldBeAdded=(time,indx,array)=>{
-			if(alltimes.indexOf(a)!=-1 || indx==0){
-				return true;
+		var ft={};
+		freqtimes.forEach(a=>ft[a]=1);
+		ft=Object.keys(ft).sort();
+		var j=0;
+		for(var i=0;i<ft.length;i++){
+			if(changes[j]>ft[i]){
+				continue;
 			}
-			var prev=array[indx-1];
-			if(!changesCache[prev]){
-				changesCache[prev]=alltimes.filter(a=>a<=prev).length;
+			timeline.push(ft[i]);
+			while(j<changes.length && changes[j]<=ft[i]){
+				j++;
 			}
-			changesCache[time]=alltimes.filter(a=>a<=time).length;
-			return changesCache[time]>changesCache[prev];
-
-		};
-		var ff={};
-		freqtimes.forEach(a=>ff[a]=1);
-		timeline=Object.keys(ff).sort().filter(shouldBeAdded);
+		}
 		ticks.push(timeline[timeline.length-1]);
 		$('#marks').innerHTML=ticks.map(a=>timeline.indexOf(a)).filter(a=>a!=-1).map(a=>`<option value="${a}">`).join('\n');
 		dirtree={};
