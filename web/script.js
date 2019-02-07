@@ -233,7 +233,9 @@ fillTimeline=(backup)=>{
 			return changesCache[time]>changesCache[prev];
 
 		};
-		timeline=freqtimes.filter((x,i,a)=>a.indexOf(x)==i).sort().filter(shouldBeAdded);
+		var ff={};
+		freqtimes.forEach(a=>ff[a]=1);
+		timeline=Object.keys(ff).sort().filter(shouldBeAdded);
 		ticks.push(timeline[timeline.length-1]);
 		$('#marks').innerHTML=ticks.map(a=>timeline.indexOf(a)).filter(a=>a!=-1).map(a=>`<option value="${a}">`).join('\n');
 		dirtree={};
