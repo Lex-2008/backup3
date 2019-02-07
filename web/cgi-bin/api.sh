@@ -74,29 +74,23 @@ case "$request" in
 		echo
 		# TODO: create dirname index for this
 		$SQLITE "PRAGMA case_sensitive_like = ON;
-		SELECT DISTINCT created
+		CREATE TEMP TABLE api AS
+		SELECT created, deleted, dirname, freq
 			FROM history
 			WHERE dirname = '$root'
 			   OR dirname LIKE '$root/%';
+		SELECT DISTINCT created FROM api;
 		SELECT '---';
-		SELECT DISTINCT deleted
-			FROM history
-			WHERE dirname = '$root'
-			   OR dirname LIKE '$root/%';
+		SELECT DISTINCT deleted FROM api;
 		SELECT '===';
 		SELECT freq, MIN(deleted)
-			FROM history
+			FROM api
 			WHERE freq != 0
-			  AND ( dirname = '$root'
-			        OR dirname LIKE '$root/%'
-			      )
 			GROUP BY freq;
 		SELECT '+++';
 		SELECT dirname, MIN(created), MAX(deleted)
-			FROM history
-			WHERE dirname = '$root'
-			   OR dirname LIKE '$root/%'
-			   GROUP BY dirname;"
+			FROM api
+			GROUP BY dirname;"
 	;;
 	(ls)
 		echo "HTTP/1.0 200 OK"
