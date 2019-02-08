@@ -1,7 +1,5 @@
 #!/bin/busybox ash
 
-BACKUP_ROOT=/backups/new
-
 test -z "$BACKUP_ROOT"    && exit 2
 
 test -z "$BACKUP_CURRENT" && BACKUP_CURRENT=$BACKUP_ROOT/current
