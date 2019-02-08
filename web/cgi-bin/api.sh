@@ -90,7 +90,8 @@ case "$request" in
 		echo
 		# TODO: create dirname index for this
 		$SQLITE "PRAGMA case_sensitive_like = ON;
-		CREATE TEMP TABLE api AS
+		ATTACH DATABASE ':memory:' AS mem;
+		CREATE TABLE mem.api AS
 		SELECT created, deleted, dirname, freq
 			FROM history
 			WHERE dirname = '$root'
