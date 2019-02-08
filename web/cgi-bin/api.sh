@@ -68,6 +68,24 @@ EOL
 fi
 
 case "$request" in
+	(all)
+		echo "HTTP/1.0 200 OK"
+		echo "Cache-Control: max-age=600"
+		echo "Content-Encoding: gzip"
+		echo
+		# TODO: rewrite it using
+		# CASE instr(dirname, "/") WHEN 0 THEN dirname ELSE substr(dirname, 1, instr(dirname, "/")-1) END = '$root'
+		# and create expression index like this:
+		# CREATE INDEX all ON history(
+		# CASE instr(dirname, "/") WHEN 0 THEN dirname ELSE substr(dirname, 1, instr(dirname, "/")-1) END );
+		# and check if it make below request faster
+		# (Note that expression indexes are supported only on SQLite 3.9.0+)
+		$SQLITE "PRAGMA case_sensitive_like = ON;
+		SELECT *
+			FROM history
+			WHERE dirname = '$root'
+			   OR dirname LIKE '$root/%';" | gzip
+	        ;;
 	(timeline)
 		echo "HTTP/1.0 200 OK"
 		echo "Cache-Control: max-age=600"
