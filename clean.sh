@@ -12,8 +12,8 @@
 test -z "$BACKUP_ROOT"    && exit 2
 
 test -z "$BACKUP_MAIN"    && BACKUP_MAIN=$BACKUP_ROOT/data
-test -z "$BACKUP_CURRENT" && BACKUP_CURRENT=$BACKUP_ROOT/current
 test -z "$BACKUP_DB"      && BACKUP_DB=$BACKUP_ROOT/backup.db
+test -z "$BACKUP_TIME_SEP" && BACKUP_TIME_SEP="~"
 
 SQLITE="sqlite3 $BACKUP_DB"
 
@@ -48,19 +48,17 @@ $SQLITE "SELECT rowid,
 		filename,
 		created,
 		deleted,
-		freq,
 		freq*(strftime('%s', 'now')-strftime('%s', deleted)) AS age
 	FROM history
 	WHERE freq != 0
-	ORDER BY age DESC;" | (
-		echo ".timeout 10000"
-		echo "BEGIN TRANSACTION;"
-		IFS='|'
-		while check_space; do
-			read rowid dirname filename created deleted freq age
-			test "$dirname" = "" && dirname="."
-			rm -f "$BACKUP_MAIN/$dirname/$filename/$created"
-			echo "DELETE FROM history WHERE rowid=$rowid;"
-		done
-		echo "END TRANSACTION;"
-	) | $SQLITE
+	ORDER BY age DESC;" | sed '
+	1i echo ".timeout 10000"
+	1i echo "BEGIN TRANSACTION;"
+	s_\(.*\)|\(.*\)|\(.*\)|\(.*\)|\(.*\)|\(.*\)_'"
+		rm -f '$BACKUP_MAIN/\\2/\\3/\\4$BACKUP_TIME_SEP\\5'
+		echo 'DELETE FROM history WHERE rowid=\\1;'
+		test \"\$(df -PB1 '$BACKUP_MAIN' | awk 'FNR==2{print \$4}')\" -lt $FREE_SPACE_NEEDED || exit 0
+	_;"'
+	$a echo "END TRANSACTION;"
+	' | sh | $SQLITE
+
