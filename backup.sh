@@ -59,96 +59,112 @@ command -v run_this >/dev/null && run_this
 mkfifo "$BACKUP_FIFO.new"
 mkfifo "$BACKUP_FIFO.new.sql"
 mkfifo "$BACKUP_FIFO.new.files"
-mkfifo "$BACKUP_FIFO.del"
-mkfifo "$BACKUP_FIFO.del.sql"
-mkfifo "$BACKUP_FIFO.del.files"
+mkfifo "$BACKUP_FIFO.old"
+mkfifo "$BACKUP_FIFO.old.sql"
+mkfifo "$BACKUP_FIFO.old.files"
 
 # listing all files together with their inodes currently in backup dir
 # note that here we use "real" find, because the busybox one doesn't have "-printf"
-/usr/bin/find "$BACKUP_CURRENT" $BACKUP_FIND_FILTER \( -type f -o -type l \) -printf '%i %P\n' | LC_ALL=POSIX sort >"$BACKUP_LIST".new
+/usr/bin/find "$BACKUP_CURRENT" $BACKUP_FIND_FILTER \( -type f -o -type l \) -printf '%i %P\0' | LC_ALL=POSIX sort -z >"$BACKUP_LIST".new
 
 # Add empty file if it's missing so comm doesn't complain
 touch "$BACKUP_LIST"
 
 # comparing this list to its previous version
-LC_ALL=POSIX comm -3 "$BACKUP_LIST" "$BACKUP_LIST".new | tee "$BACKUP_FIFO.new" >"$BACKUP_FIFO.del" &
+LC_ALL=POSIX comm -z -3 "$BACKUP_LIST" "$BACKUP_LIST".new | tee "$BACKUP_FIFO.new" >"$BACKUP_FIFO.old" &
+
+# note that here we use "real" sed, because the busybox one doesn't have "-z"
 
 ### NEW FILES ###
 
-sed '	/^\t/!d;          # delete lines not starting with TAB
+/bin/sed -z '/^\t/!d;     # delete lines not starting with TAB
 	/"/d;             # delete lines with double-quotes in filenames
 	s/^\t[0-9]* //;   # delete tab and inode number
 	' "$BACKUP_FIFO.new" | tee "$BACKUP_FIFO.new.sql" >"$BACKUP_FIFO.new.files" &
 
 # SQL query for new files
-xargs -d"$NL" stat -c "%s %n" <"$BACKUP_FIFO.new.sql" | sed '
+cd "$BACKUP_CURRENT" # to pass relative pathnames to stat
+xargs -0 stat -c "%s %n" <"$BACKUP_FIFO.new.sql" | sed '
 	1i .timeout 10000
 	1i BEGIN TRANSACTION;
 	'"s/'/''/g"'      # duplicate single quotes
 	/^[^/]*$/s_ _ /_; # ensure all lines have dir separator
-	s_\([0-9]*\) \(.*\)/\(.*\)_
-		INSERT INTO history (dirname, filename, created, deleted, freq, size)
+	s_\([0-9]*\) \(.*\)/\(.*\)_	\
+		INSERT INTO history (dirname, filename, created, deleted, freq, size)	\
 		VALUES '"('\\2', '\\3', '$BACKUP_TIME', 'now', 0, '\\1')"';_
 	$a END TRANSACTION;
-	' | $SQLITE &
+	' | tee ../dbg.new.sql | $SQLITE &
+cd - >/dev/null
 
 # operate on new files
-/usr/bin/xargs -a "$BACKUP_FIFO.new.files" -d"$NL" -I~ echo mkdir -p "$BACKUP_MAIN/%" && ln "$BACKUP_CURRENT/%" "$BACKUP_MAIN/%/$BACKUP_TIME$BACKUP_TIME_SEP$BACKUP_TIME_NOW" | sh &
-
+cmd="cd \"$BACKUP_MAIN\"
+mkdir -p \"\$@\"
+echo \"\$@\" >../dbg.new.files
+while test \$# -ge 1; do
+	ln -T \"$BACKUP_CURRENT/\$1\" \"$BACKUP_MAIN/\$1/$BACKUP_TIME$BACKUP_TIME_SEP$BACKUP_TIME_NOW\"
+	shift
+done" 
+<"$BACKUP_FIFO.new.files" xargs -0 sh -c "$cmd" x &
 
 ### OLD FILES ###
 
-sed '	/^\t/d;           # delete lines starting with TAB
+/bin/sed -z '/^\t/d;      # delete lines starting with TAB
 	/"/d;             # delete lines with double-quotes in filenames
-	s/^\t[0-9]* //;   # delete tab and inode number
+	s/^[0-9]* //;     # delete inode number
 	'"s/'/''/g"'      # duplicate single quotes
 	/^[^/]*$/s_^_/_;  # ensure all lines have dir separator
 	' "$BACKUP_FIFO.old" | tee "$BACKUP_FIFO.old.sql" >"$BACKUP_FIFO.old.files" &
 
 # SQL query for old files
-sed '	1i .timeout 10000
+/bin/sed -z '1i .timeout 10000
 	1i BEGIN TRANSACTION;
-	s_\(.*\)/\(.*\)_'"
-		UPDATE history
-		SET 	deleted = '$BACKUP_TIME',
-			freq = CASE
-				WHEN strftime('%Y-%m', created,        '-1 minute') !=
-				     strftime('%Y-%m', '$BACKUP_TIME', '-1 minute')
-				     THEN 1 -- different month
-				WHEN strftime('%Y %W', created,        '-1 minute') !=
-				     strftime('%Y %W', '$BACKUP_TIME', '-1 minute')
-				     THEN 5 -- different week
-				WHEN strftime('%Y-%m-%d', created,        '-1 minute') !=
-				     strftime('%Y-%m-%d', '$BACKUP_TIME', '-1 minute')
-				     THEN 30 -- different day
-				WHEN strftime('%Y-%m-%d %H', created,        '-1 minute') !=
-				     strftime('%Y-%m-%d %H', '$BACKUP_TIME', '-1 minute')
-				     THEN 720 -- different hour
-				ELSE $BACKUP_MAX_FREQ
-			END
-		WHERE dirname = '\\1'
-		  AND filename = '\\2'
-		  AND created != '$BACKUP_TIME'
-		  AND freq = 0;
-		_"'
+	s_\(.*\)/\(.*\)_'"	\\
+		UPDATE history	\\
+		SET 	deleted = '$BACKUP_TIME',	\\
+			freq = CASE	\\
+				WHEN strftime('%Y-%m', created,        '-1 minute') !=	\\
+				     strftime('%Y-%m', '$BACKUP_TIME', '-1 minute')	\\
+				     THEN 1 -- different month	\\
+				WHEN strftime('%Y %W', created,        '-1 minute') !=	\\
+				     strftime('%Y %W', '$BACKUP_TIME', '-1 minute')	\\
+				     THEN 5 -- different week	\\
+				WHEN strftime('%Y-%m-%d', created,        '-1 minute') !=	\\
+				     strftime('%Y-%m-%d', '$BACKUP_TIME', '-1 minute')		\\
+				     THEN 30 -- different day	\\
+				WHEN strftime('%Y-%m-%d %H', created,        '-1 minute') !=	\\
+				     strftime('%Y-%m-%d %H', '$BACKUP_TIME', '-1 minute')	\\
+				     THEN 720 -- different hour	\\
+				ELSE $BACKUP_MAX_FREQ		\\
+			END			\\
+		WHERE dirname = '\\1'		\\
+		  AND filename = '\\2'		\\
+		  AND created != '$BACKUP_TIME'	\\
+		  AND freq = 0;_"'
 	$a END TRANSACTION;
-	' "$BACKUP_FIFO.old.sql" | $SQLITE &
+	' "$BACKUP_FIFO.old.sql" | tr '\0' '\n' | tee dbg.old.sql | $SQLITE &
 
 # operate on old files
-sed '	1i .timeout 10000
+cmd="cd \"$BACKUP_MAIN\"
+echo \"\$@\" >../dbg.old.files
+while test \$# -ge 1; do
+	mv \"\$1$BACKUP_TIME_SEP$BACKUP_TIME_NOW\" \"\$1$BACKUP_TIME_SEP$BACKUP_TIME\"
+	shift
+done" 
+/bin/sed -z '1i .timeout 10000
 	1i BEGIN TRANSACTION;
-	s_\(.*\)/\(.*\)_'"
-		SELECT dirname, filename, created
-		FROM history
-		WHERE dirname = '\\1'
-		  AND filename = '\\2'
-		  AND created != '$BACKUP_TIME'
-		  AND freq = 0;
-		_"'
+	s_\(.*\)/\(.*\)_'"			\\
+		SELECT dirname || '/' || filename || '/' || created	\\
+		FROM history			\\
+		WHERE dirname = '\\1'		\\
+		  AND filename = '\\2'		\\
+		  AND created != '$BACKUP_TIME'	\\
+		  AND (freq = 0			\\
+		    OR deleted = '$BACKUP_TIME');_"'
 	$a END TRANSACTION;
-	' "$BACKUP_FIFO.old.files" | $SQLITE | sed 's_\(.*\)|\(.*\)|\(.*\)_'"mv $BACKUP_MAIN/\\1/\\2\\3$BACKUP_TIME_SEP$BACKUP_TIME_NOW $BACKUP_MAIN/\\1/\\2\\3$BACKUP_TIME_SEP$BACKUP_TIME;_" | sh &
+	' "$BACKUP_FIFO.old.files" | tr '\0' '\n' | $SQLITE | tee dbg.old.files1 | tr '\n' '\0' | xargs -0 sh -c "$cmd" x &
 
 # wait for all background activity to finish
+jobs
 wait
 
 # clean up
