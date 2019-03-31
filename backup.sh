@@ -93,13 +93,12 @@ xargs -0 stat -c "%s %n" <"$BACKUP_FIFO.new.sql" | sed '
 		INSERT INTO history (dirname, filename, created, deleted, freq, size)	\
 		VALUES '"('\\2', '\\3', '$BACKUP_TIME', 'now', 0, '\\1')"';_
 	$a END TRANSACTION;
-	' | tee ../dbg.new.sql | $SQLITE &
+	' | $SQLITE &
 cd - >/dev/null
 
 # operate on new files
 cmd="cd \"$BACKUP_MAIN\"
 mkdir -p \"\$@\"
-echo \"\$@\" >../dbg.new.files
 while test \$# -ge 1; do
 	ln -T \"$BACKUP_CURRENT/\$1\" \"$BACKUP_MAIN/\$1/$BACKUP_TIME$BACKUP_TIME_SEP$BACKUP_TIME_NOW\"
 	shift
@@ -141,11 +140,10 @@ done"
 		  AND created != '$BACKUP_TIME'	\\
 		  AND freq = 0;_"'
 	$a END TRANSACTION;
-	' "$BACKUP_FIFO.old.sql" | tr '\0' '\n' | tee dbg.old.sql | $SQLITE &
+	' "$BACKUP_FIFO.old.sql" | tr '\0' '\n' | $SQLITE &
 
 # operate on old files
 cmd="cd \"$BACKUP_MAIN\"
-echo \"\$@\" >../dbg.old.files
 while test \$# -ge 1; do
 	mv \"\$1$BACKUP_TIME_SEP$BACKUP_TIME_NOW\" \"\$1$BACKUP_TIME_SEP$BACKUP_TIME\"
 	shift
@@ -161,10 +159,9 @@ done"
 		  AND (freq = 0			\\
 		    OR deleted = '$BACKUP_TIME');_"'
 	$a END TRANSACTION;
-	' "$BACKUP_FIFO.old.files" | tr '\0' '\n' | $SQLITE | tee dbg.old.files1 | tr '\n' '\0' | xargs -0 sh -c "$cmd" x &
+	' "$BACKUP_FIFO.old.files" | tr '\0' '\n' | $SQLITE | tr '\n' '\0' | xargs -0 sh -c "$cmd" x &
 
 # wait for all background activity to finish
-jobs
 wait
 
 # clean up
