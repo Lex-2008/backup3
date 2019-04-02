@@ -84,7 +84,7 @@ LC_ALL=POSIX comm -z -3 "$BACKUP_LIST" "$BACKUP_LIST".new | tee "$BACKUP_FIFO.ne
 
 # SQL query for new files
 cd "$BACKUP_CURRENT" # to pass relative pathnames to stat
-xargs -0 stat -c "%s %n" <"$BACKUP_FIFO.new.sql" | sed '
+xargs -r -0 stat -c "%s %n" <"$BACKUP_FIFO.new.sql" | sed '
 	1i .timeout 10000
 	1i BEGIN TRANSACTION;
 	'"s/'/''/g"'      # duplicate single quotes
@@ -103,7 +103,7 @@ while test \$# -ge 1; do
 	ln -T \"$BACKUP_CURRENT/\$1\" \"$BACKUP_MAIN/\$1/$BACKUP_TIME$BACKUP_TIME_SEP$BACKUP_TIME_NOW\"
 	shift
 done" 
-<"$BACKUP_FIFO.new.files" xargs -0 sh -c "$cmd" x &
+<"$BACKUP_FIFO.new.files" xargs -r -0 sh -c "$cmd" x &
 
 ### OLD FILES ###
 
@@ -159,7 +159,7 @@ done"
 		  AND (freq = 0			\\
 		    OR deleted = '$BACKUP_TIME');_"'
 	$a END TRANSACTION;
-	' "$BACKUP_FIFO.old.files" | tr '\0' '\n' | $SQLITE | tr '\n' '\0' | xargs -0 sh -c "$cmd" x &
+	' "$BACKUP_FIFO.old.files" | tr '\0' '\n' | $SQLITE | tr '\n' '\0' | xargs -r -0 sh -c "$cmd" x &
 
 # wait for all background activity to finish
 wait
