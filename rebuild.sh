@@ -48,5 +48,5 @@ flock -n 200 || exit 200
 	UPDATE history	\\
 		SET deleted = '9999-01-01 00:00'	\\
 		WHERE deleted = '$BACKUP_TIME_NOW';	\\
-	END TRANSACTION;" | tee rebuild.dbg.txt | $SQLITE
+	END TRANSACTION;" | $SQLITE
 
