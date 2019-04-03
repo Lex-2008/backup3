@@ -65,6 +65,7 @@ mkfifo "$BACKUP_FIFO.old.files"
 
 # listing all files together with their inodes currently in backup dir
 # note that here we use "real" find, because the busybox one doesn't have "-printf"
+# if changing, copypaste to rebuild.sh
 /usr/bin/find "$BACKUP_CURRENT" $BACKUP_FIND_FILTER \( -type f -o -type l \) -printf '%i %P\0' | LC_ALL=POSIX sort -z >"$BACKUP_LIST".new
 
 # Add empty file if it's missing so comm doesn't complain

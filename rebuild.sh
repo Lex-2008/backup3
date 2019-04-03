@@ -4,10 +4,12 @@
 
 test -z "$BACKUP_ROOT"    && exit 2
 
+test -z "$BACKUP_CURRENT" && BACKUP_CURRENT=$BACKUP_ROOT/current
+test -z "$BACKUP_LIST"    && BACKUP_LIST=$BACKUP_ROOT/files.txt
 test -z "$BACKUP_FLOCK"   && BACKUP_FLOCK=$BACKUP_ROOT/lock
 test -z "$BACKUP_MAIN"    && BACKUP_MAIN=$BACKUP_ROOT/data
 test -z "$BACKUP_DB"      && BACKUP_DB=$BACKUP_ROOT/backup.db
-test -z "$BACKUP_TIME_SEP" && BACKUP_TIME_SEP="~"
+test -z "$BACKUP_TIME_SEP" && BACKUP_TIME_SEP="~" # must NOT be /
 test -z "$BACKUP_TIME_NOW" && BACKUP_TIME_NOW=now
 test -z "$BACKUP_MAX_FREQ" && BACKUP_MAX_FREQ=8640
 
@@ -17,7 +19,7 @@ SQLITE="sqlite3 $BACKUP_DB"
 exec 200>"$BACKUP_FLOCK"
 flock -n 200 || exit 200
 
-### NEW FILES ###
+### DATABASE ###
 
 /usr/bin/find "$BACKUP_MAIN" $BACKUP_FIND_FILTER \( -type f -o -type l \) -printf '%s %P\n' | sed '
 	1i .timeout 10000
@@ -50,3 +52,20 @@ flock -n 200 || exit 200
 		WHERE deleted = '$BACKUP_TIME_NOW';	\\
 	END TRANSACTION;" | $SQLITE
 
+### CURRENT ###
+
+rm -rf "$BACKUP_CURRENT"
+
+cmd="
+while test \$# -ge 1; do
+	ln -T \"$BACKUP_MAIN/\$1\" \"$BACKUP_CURRENT/\$(dirname \"\$1\")\"
+	shift
+done" 
+
+/usr/bin/find "$BACKUP_MAIN" $BACKUP_FIND_FILTER \( -type f -o -type l \) -name "*$BACKUP_TIME_SEP$BACKUP_TIME_NOW" -printf '%P\0' | xargs -r -0 sh -c "$cmd" x
+
+### FILES.TXT ###
+
+# from build.sh
+/usr/bin/find "$BACKUP_CURRENT" $BACKUP_FIND_FILTER \( -type f -o -type l \) -printf '%i %P\0' | LC_ALL=POSIX sort -z >"$BACKUP_LIST".new
+mv "$BACKUP_LIST".new "$BACKUP_LIST"
