@@ -12,7 +12,9 @@ test -z "$BACKUP_FLOCK"   && BACKUP_FLOCK=$BACKUP_ROOT/lock
 test -z "$BACKUP_MAIN"    && BACKUP_MAIN=$BACKUP_ROOT/data
 test -z "$BACKUP_LIST"    && BACKUP_LIST=$BACKUP_ROOT/files.txt
 test -z "$BACKUP_DB"      && BACKUP_DB=$BACKUP_ROOT/backup.db
-test -z "$BACKUP_DB_BAK"  && BACKUP_DB_BAK=backup.db
+test -z "$BACKUP_TIME_SEP" && BACKUP_TIME_SEP="~"
+test -z "$BACKUP_TIME_NOW" && BACKUP_TIME_NOW=now
+test -z "$BACKUP_MAX_FREQ" && BACKUP_MAX_FREQ=8640
 
 SQLITE="sqlite3 $BACKUP_DB"
 
@@ -20,36 +22,57 @@ SQLITE="sqlite3 $BACKUP_DB"
 exec 200>"$BACKUP_FLOCK"
 flock -n 200 || exit 200
 
-test "$1" = '--delete' && DELETE_MISSING=1
+if test "$1" = '--fix'; then
+	FIX=1
+	export FIX
+fi
 
 
 db2current ()
 {
 	echo "Checking DB => current FS"
 
-	$SQLITE "SELECT rowid, dirname, filename, created
+	cmd="	echo '.timeout 10000'
+		echo 'BEGIN TRANSACTION;'
+		while test \$# -ge 1; do
+			filename=\"\${1%%|*}\"
+			rowid=\"\${1##*|}\"
+			if ! test -e \"$BACKUP_CURRENT/\$filename\"; then
+				echo \"$BACKUP_CURRENT/\$filename\" >>check.db2current
+				test -n \"$FIX\" && echo \"DELETE FROM history WHERE rowid='\$rowid';\"
+			fi
+			shift
+		done
+		echo 'END TRANSACTION;'"
+
+	$SQLITE "SELECT dirname || '/' || filename,
+			rowid
 		FROM history
 		WHERE freq = 0
-		ORDER BY dirname;" | while IFS='|' read rowid dirname filename created; do
-		if ! test -e "$BACKUP_CURRENT/$dirname/$filename"; then
-			echo "Missing file: [$dirname][$filename][$created]" >&2
-			test -n "$DELETE_MISSING" && echo "DELETE FROM history WHERE rowid='$rowid';"
-		fi
-	done | $SQLITE
+		ORDER BY dirname;" | tr '\n' '\0' | xargs -0 sh -c "$cmd" x | $SQLITE
 }
 
 db2old ()
 {
 	echo "Checking DB => old FS"
 
-	$SQLITE "SELECT rowid, dirname, filename, created
+	cmd="	echo '.timeout 10000'
+		echo 'BEGIN TRANSACTION;'
+		while test \$# -ge 1; do
+			filename=\"\${1%%|*}\"
+			rowid=\"\${1##*|}\"
+			if ! test -e \"$BACKUP_MAIN/\$filename\"; then
+				echo \"$BACKUP_MAIN/\$filename\" >>check.db2old
+				test -n \"$FIX\" && echo \"DELETE FROM history WHERE rowid='\$rowid';\"
+			fi
+			shift
+		done
+		echo 'END TRANSACTION;'"
+
+	$SQLITE "SELECT dirname || '/' || filename || '/' || created || '$BACKUP_TIME_SEP' || deleted,
+			rowid
 		FROM history
-		ORDER BY dirname;" | while IFS='|' read rowid dirname filename created; do
-		if ! test -e "$BACKUP_MAIN/$dirname/$filename/$created"; then
-			echo "Missing file: [$dirname][$filename][$created]" >&2
-			test -n "$DELETE_MISSING" && echo "DELETE FROM history WHERE rowid='$rowid';"
-		fi
-	done | $SQLITE
+		ORDER BY dirname;" | tr '\n' '\0' | xargs -0 sh -c "$cmd" x | $SQLITE
 }
 
 current2db ()
@@ -57,12 +80,12 @@ current2db ()
 	echo "Checking current FS => DB"
 
 	/usr/bin/find "$BACKUP_CURRENT" \( -type f -o -type l \) -printf '%P\n' | sed '/"/d;s_^\(\(.*\)/\)\?\(.*\)$_SELECT CASE WHEN EXISTS(SELECT 1 FROM history WHERE dirname="\2" AND filename="\3" AND freq=0 LIMIT 1) THEN 1 ELSE "\2/\3" END;_' | $SQLITE | fgrep -v -x 1 | (
-		if test -n "$DELETE_MISSING"; then
+		if test -n "$FIX"; then
 			cd "$BACKUP_CURRENT"
-			tee /dev/stderr | fgrep -v -f- "$BACKUP_LIST" >"$BACKUP_LIST.new"
+			tee "$BACKUP_ROOT/check.current2db" | fgrep -vz -f- "$BACKUP_LIST" >"$BACKUP_LIST.new"
 			mv "$BACKUP_LIST.new" "$BACKUP_LIST"
 		else
-			cat
+			cat >"$BACKUP_ROOT/check.current2db"
 		fi
 	)
 }
@@ -70,12 +93,12 @@ current2db ()
 old2db ()
 {
 	echo "Checking old FS => DB"
-	/usr/bin/find "$BACKUP_MAIN" \( -type f -o -type l \) -printf '%P\n' | sed '/"/d;s_^\(\(.*\)/\)\?\(.*\)/\(.*\)$_SELECT CASE WHEN EXISTS(SELECT 1 FROM history WHERE dirname="\2" AND filename="\3" AND created="\4" LIMIT 1) THEN 1 ELSE "\2/\3/\4" END;_' | $SQLITE | fgrep -v -x 1 | (
-		if test -n "$DELETE_MISSING"; then
+	/usr/bin/find "$BACKUP_MAIN" \( -type f -o -type l \) -printf '%P\n' | sed '/"/d;s_^\(\(.*\)/\)\?\(.*\)/\(.*\)'"$BACKUP_TIME_SEP"'\(.*\)$_SELECT CASE WHEN EXISTS(SELECT 1 FROM history WHERE dirname="\2" AND filename="\3" AND created="\4" AND deleted="\5" LIMIT 1) THEN 1 ELSE "\2/\3/\4'"$BACKUP_TIME_SEP"'\5" END;_' | $SQLITE | fgrep -v -x 1 | (
+		if test -n "$FIX"; then
 			cd "$BACKUP_MAIN"
-			tee /dev/stderr | tr '\n' '\0' | xargs -0 rm -f
+			tee "$BACKUP_ROOT/check.old2db" | tr '\n' '\0' | xargs -0 rm -f
 		else
-			cat
+			cat >"$BACKUP_ROOT/check.old2db"
 		fi
 	)
 }
@@ -84,10 +107,10 @@ current2old ()
 {
 	echo "Checking current FS => old FS"
 
-	/usr/bin/find "$BACKUP_CURRENT" \( -type f -o -type l \) -printf '%i %P\n' | grep -v "^[0-9]* *$BACKUP_DB_BAK$" | while read inode fullname; do
+	/usr/bin/find "$BACKUP_CURRENT" \( -type f -o -type l \) -printf '%i %P\n' | while read inode fullname; do
 		ls -i "$BACKUP_MAIN/$fullname" 2>/dev/null | grep -q "^ *$inode " || echo "$fullname"
 	done | (
-		if test -n "$DELETE_MISSING"; then
+		if test -n "$FIX"; then
 			cd "$BACKUP_CURRENT"
 			# These files might either be in DB, or not. If they
 			# are not in DB - it was taken care of above, in
@@ -98,56 +121,49 @@ current2old ()
 			# clears inode numbers of relevant entries in
 			# "$BACKUP_LIST", and apply it. After that we must sort
 			# "$BACKUP_LIST" file again
-			sed 's/.*/s|^[0-9]* &$|0 &|;/' | sed -f /dev/stdin "$BACKUP_LIST" >"$BACKUP_LIST.new"
-			LC_ALL=POSIX sort "$BACKUP_LIST.new" >"$BACKUP_LIST"
+			tee "$BACKUP_ROOT/check.current2old" | sed 's/.*/s|^[0-9]* &$|0 &|;/' | /bin/sed -z -f /dev/stdin "$BACKUP_LIST" >"$BACKUP_LIST.new"
+			LC_ALL=POSIX sort -z "$BACKUP_LIST.new" >"$BACKUP_LIST"
 		else
-			cat
+			cat >"$BACKUP_ROOT/check.current2old"
 		fi
 	)
 }
 
 db_overlaps ()
 {
-	if test -n "$DELETE_MISSING"; then
-		echo "Fixing overlapping dates in DB"
-		$SQLITE "UPDATE history
-			SET deleted = (
-				SELECT created
-				FROM history AS b
-				WHERE history.created < b.created
-				AND history.dirname = b.dirname
-				AND history.filename = b.filename
-				AND history.created < b.deleted
-				AND b.created < history.deleted
-				LIMIT 1
-			),
-			freq = 123 -- proper value will be set in db_freq later
-			WHERE EXISTS (
-				SELECT *
-				FROM history AS b
-				WHERE history.created < b.created
-				AND history.dirname = b.dirname
-				AND history.filename = b.filename
-				AND history.created < b.deleted
-				AND b.created < history.deleted
-			);"
-	else
-		echo "Checking overlapping dates in DB"
-		$SQLITE "SELECT a.*, b.created
-			FROM history AS a,
-			history AS b
-				WHERE a.created < b.created
-				AND a.dirname = b.dirname
-				AND a.filename = b.filename
-				AND a.created < b.deleted
-				AND b.created < a.deleted
-			;"
-	fi
+	echo "Checking overlapping dates in DB"
+	cmd="	echo '.timeout 10000'
+		echo 'BEGIN TRANSACTION;'
+		while test \$# -ge 1; do
+			filenames=\"\${1%|*}\"
+			filename1=\"\${filenames%%|*}\"
+			filename2=\"\${filenames##*|}\"
+			sql=\"\${1##*|}\"
+			echo \"[\$filename1][\$filename2][\$sql]\" >>check.db_overlaps
+			if test -n \"$FIX\"; then
+				mv \"$BACKUP_MAIN/\$filename1\" \"$BACKUP_MAIN/\$filename2\"
+				echo \"\$sql\"
+			fi
+			shift
+		done
+		echo 'END TRANSACTION;'"
+	$SQLITE "SELECT
+			a.dirname || '/' || a.filename || '/' || a.created || '$BACKUP_TIME_SEP' || a.deleted,
+			a.dirname || '/' || a.filename || '/' || a.created || '$BACKUP_TIME_SEP' || b.created,
+			'UPDATE history SET deleted = \"' || b.created || '\" WHERE rowid = \"' || a.rowid || '\";'
+		FROM history AS a, history AS b
+		WHERE a.created < b.created
+			AND a.dirname = b.dirname
+			AND a.filename = b.filename
+			AND a.created < b.deleted
+			AND b.created < a.deleted
+		GROUP BY a.dirname, a.filename, a.created
+		ORDER BY a.dirname;" | tr '\n' '\0' | xargs -0 sh -c "$cmd" x | $SQLITE
 }
 
 db_order ()
 {
-	if test -n "$DELETE_MISSING"; then
+	if test -n "$FIX"; then
 		echo "Deleting where created not < deleted in DB"
 		$SQLITE "DELETE
 			FROM history
@@ -156,7 +172,7 @@ db_order ()
 		echo "Checking that created < deleted in DB"
 		$SQLITE "SELECT *
 			FROM history
-			WHERE created >= deleted;"
+			WHERE created >= deleted;" >check.db_order
 	fi
 }
 
@@ -185,7 +201,7 @@ db_dups_created ()
 					AND history.rowid < b.rowid
 				)
 			)
-		);"
+		);" >check.db_dups_created
 }
 
 db_dups_freq0 ()
@@ -199,7 +215,7 @@ db_dups_freq0 ()
 			AND a.dirname = b.dirname
 			AND a.filename = b.filename
 			AND b.freq = 0
-			;"
+			;" >check.db_dups_freq0
 }
 
 db_freq ()
@@ -220,7 +236,7 @@ db_freq ()
 				WHEN strftime('%Y-%m-%d %H', created, '-1 minute') !=
 				     strftime('%Y-%m-%d %H', deleted, '-1 minute')
 				     THEN 720 -- different hour
-				ELSE 8640
+				ELSE $BACKUP_MAX_FREQ
 			END
 			WHERE freq != 0;"
 	else
@@ -241,10 +257,13 @@ db_freq ()
 				WHEN strftime('%Y-%m-%d %H', created, '-1 minute') !=
 				     strftime('%Y-%m-%d %H', deleted, '-1 minute')
 				     THEN 720 -- different hour
-				ELSE 8640
-			END;"
+				ELSE $BACKUP_MAX_FREQ
+			END;" >check.db_freq
 	fi
 }
+
+test -e check.sh && exit 3
+rm check.*
 
 $SQLITE "CREATE INDEX IF NOT EXISTS check_tmp ON history(dirname, filename, created);"
 
@@ -270,4 +289,6 @@ old2db
 # This test should never fail
 db_dups_freq0
 
-$SQLITE "DROP INDEX IF EXISTS check_tmp;VACUUM;"
+$SQLITE "DROP INDEX IF EXISTS check_tmp;VACUUM;ANALYZE;"
+
+wc -l check.*
