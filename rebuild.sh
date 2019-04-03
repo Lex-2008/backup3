@@ -29,8 +29,8 @@ flock -n 200 || exit 200
 	/[/].*[/]/!s_ _ /_; # ensure all lines have two dir separators
 	s_\([0-9]*\) \(.*\)/\(.*\)/\(.*\)'"$BACKUP_TIME_SEP"'\(.*\)_	\
 		INSERT INTO history (dirname, filename, created, deleted, freq, size)	\
-		VALUES ("\2", "\3", "\4", "\5", 0, "\1");_
-	$a '"UPDATE history	\\
+		VALUES '"('\\2', '\\3', '\\4', '\\5', 0, '\\1');_
+	\$a UPDATE history	\\
 		SET freq = CASE		\\
 			WHEN strftime('%Y-%m', created, '-1 minute') !=	\\
 			     strftime('%Y-%m', deleted, '-1 minute')	\\
@@ -55,7 +55,9 @@ rm -rf "$BACKUP_CURRENT"
 
 cmd="
 while test \$# -ge 1; do
-	ln -T \"$BACKUP_MAIN/\$1\" \"$BACKUP_CURRENT/\$(dirname \"\$1\")\"
+	fullname=\"\$(dirname \"\$1\")\"
+	mkdir -p \"$BACKUP_CURRENT/\$(dirname \"\$fullname\")\"
+	ln -T \"$BACKUP_MAIN/\$1\" \"$BACKUP_CURRENT/\$fullname\"
 	shift
 done" 
 
