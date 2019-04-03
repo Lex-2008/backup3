@@ -15,7 +15,7 @@ test -z "$BACKUP_DB"      && BACKUP_DB=$BACKUP_ROOT/backup.db
 test -n "$BACKUP_TIME"    && BACKUP_TIME="$(date -d "$BACKUP_TIME" +"%F %H:%M")"
 test -z "$BACKUP_TIME"    && BACKUP_TIME="$(date +"%F %H:%M")"
 test -z "$BACKUP_TIME_SEP" && BACKUP_TIME_SEP="~"
-test -z "$BACKUP_TIME_NOW" && BACKUP_TIME_NOW=now
+test -z "$BACKUP_TIME_NOW" && BACKUP_TIME_NOW=now # must be 'now' or valid date in future
 test -z "$BACKUP_MAX_FREQ" && BACKUP_MAX_FREQ=8640
 
 SQLITE="sqlite3 $BACKUP_DB"
@@ -92,7 +92,7 @@ xargs -r -0 stat -c "%s %n" <"$BACKUP_FIFO.new.sql" | sed '
 	/^[^/]*$/s_ _ /_; # ensure all lines have dir separator
 	s_\([0-9]*\) \(.*\)/\(.*\)_	\
 		INSERT INTO history (dirname, filename, created, deleted, freq, size)	\
-		VALUES '"('\\2', '\\3', '$BACKUP_TIME', 'now', 0, '\\1')"';_
+		VALUES '"('\\2', '\\3', '$BACKUP_TIME', '$BACKUP_TIME_NOW', 0, '\\1')"';_
 	$a END TRANSACTION;
 	' | $SQLITE &
 cd - >/dev/null
