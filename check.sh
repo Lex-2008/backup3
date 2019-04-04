@@ -93,14 +93,24 @@ current2db ()
 old2db ()
 {
 	echo "Checking old FS => DB"
-	/usr/bin/find "$BACKUP_MAIN" \( -type f -o -type l \) -printf '%P\n' | sed '/"/d;s_^\(\(.*\)/\)\?\(.*\)/\(.*\)'"$BACKUP_TIME_SEP"'\(.*\)$_SELECT CASE WHEN EXISTS(SELECT 1 FROM history WHERE dirname="\2" AND filename="\3" AND created="\4" AND deleted="\5" LIMIT 1) THEN 1 ELSE "\2/\3/\4'"$BACKUP_TIME_SEP"'\5" END;_' | $SQLITE | fgrep -v -x 1 | (
-		if test -n "$FIX"; then
-			cd "$BACKUP_MAIN"
-			tee "$BACKUP_ROOT/check.old2db" | tr '\n' '\0' | xargs -0 rm -f
-		else
-			cat >"$BACKUP_ROOT/check.old2db"
-		fi
-	)
+	if test -n "$FIX"; then
+		/usr/bin/find "$BACKUP_MAIN" \( -type f -o -type l \) -printf '%s %P\n' | sed '
+		/"/d;
+		s_^\([0-9]*\) \(\(.*\)/\)\?\(.*\)/\(.*\)'"$BACKUP_TIME_SEP"'\(.*\)$_	\
+			INSERT INTO history(dirname, filename, created, deleted, freq, size)	\
+			SELECT "\3", "\4", "\5", "\6", 0, "\1"					\
+			WHERE NOT EXISTS (	\
+				SELECT 1	\
+				FROM history	\
+				WHERE dirname="\3"	\
+				  AND filename="\4"	\
+				  AND created="\5"	\
+				  AND deleted="\6"	\
+				LIMIT 1);	\
+			_' | $SQLITE
+	else
+		/usr/bin/find "$BACKUP_MAIN" \( -type f -o -type l \) -printf '%P\n' | sed '/"/d;s_^\(\(.*\)/\)\?\(.*\)/\(.*\)'"$BACKUP_TIME_SEP"'\(.*\)$_SELECT CASE WHEN EXISTS(SELECT 1 FROM history WHERE dirname="\2" AND filename="\3" AND created="\4" AND deleted="\5" LIMIT 1) THEN 1 ELSE "\2/\3/\4'"$BACKUP_TIME_SEP"'\5" END;_' | $SQLITE | fgrep -v -x 1 >"$BACKUP_ROOT/check.old2db"
+	fi
 }
 
 current2old ()
