@@ -87,13 +87,12 @@ LC_ALL=POSIX comm -z -3 "$BACKUP_LIST" "$BACKUP_LIST".new | tee "$BACKUP_FIFO.ne
 cd "$BACKUP_CURRENT" # to pass relative pathnames to stat
 xargs -r -0 stat -c "%s %n" <"$BACKUP_FIFO.new.sql" | sed '
 	1i .timeout 10000
-	1i BEGIN TRANSACTION;
+	1i PRAGMA synchronous=normal;
 	'"s/'/''/g"'      # duplicate single quotes
 	/^[^/]*$/s_ _ /_; # ensure all lines have dir separator
 	s_\([0-9]*\) \(.*\)/\(.*\)_	\
 		INSERT INTO history (dirname, filename, created, deleted, freq, size)	\
 		VALUES '"('\\2', '\\3', '$BACKUP_TIME', '$BACKUP_TIME_NOW', 0, '\\1')"';_
-	$a END TRANSACTION;
 	' | $SQLITE &
 cd - >/dev/null
 
@@ -117,7 +116,7 @@ done"
 
 # SQL query for old files
 /bin/sed -z '1i .timeout 10000
-	1i BEGIN TRANSACTION;
+	1i PRAGMA synchronous=normal;
 	s_\(.*\)/\(.*\)_'"	\\
 		UPDATE history	\\
 		SET 	deleted = '$BACKUP_TIME',	\\
@@ -140,7 +139,6 @@ done"
 		  AND filename = '\\2'		\\
 		  AND created != '$BACKUP_TIME'	\\
 		  AND freq = 0;_"'
-	$a END TRANSACTION;
 	' "$BACKUP_FIFO.old.sql" | tr '\0' '\n' | $SQLITE &
 
 # operate on old files
@@ -150,7 +148,6 @@ while test \$# -ge 1; do
 	shift
 done" 
 /bin/sed -z '1i .timeout 10000
-	1i BEGIN TRANSACTION;
 	s_\(.*\)/\(.*\)_'"			\\
 		SELECT dirname || '/' || filename || '/' || created	\\
 		FROM history			\\
@@ -159,7 +156,6 @@ done"
 		  AND created != '$BACKUP_TIME'	\\
 		  AND (freq = 0			\\
 		    OR deleted = '$BACKUP_TIME');_"'
-	$a END TRANSACTION;
 	' "$BACKUP_FIFO.old.files" | tr '\0' '\n' | $SQLITE | tr '\n' '\0' | xargs -r -0 sh -c "$cmd" x &
 
 # wait for all background activity to finish
