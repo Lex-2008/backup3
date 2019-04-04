@@ -30,8 +30,6 @@ fi
 
 db2current ()
 {
-	echo "Checking DB => current FS"
-
 	cmd="	echo '.timeout 10000'
 		echo 'BEGIN TRANSACTION;'
 		while test \$# -ge 1; do
@@ -44,7 +42,6 @@ db2current ()
 			shift
 		done
 		echo 'END TRANSACTION;'"
-
 	$SQLITE "SELECT dirname || '/' || filename,
 			rowid
 		FROM history
@@ -54,8 +51,6 @@ db2current ()
 
 db2old ()
 {
-	echo "Checking DB => old FS"
-
 	cmd="	echo '.timeout 10000'
 		echo 'BEGIN TRANSACTION;'
 		while test \$# -ge 1; do
@@ -68,7 +63,6 @@ db2old ()
 			shift
 		done
 		echo 'END TRANSACTION;'"
-
 	$SQLITE "SELECT dirname || '/' || filename || '/' || created || '$BACKUP_TIME_SEP' || deleted,
 			rowid
 		FROM history
@@ -77,8 +71,6 @@ db2old ()
 
 current2db ()
 {
-	echo "Checking current FS => DB"
-
 	/usr/bin/find "$BACKUP_CURRENT" \( -type f -o -type l \) -printf '%P\n' | sed '/"/d;s_^\(\(.*\)/\)\?\(.*\)$_SELECT CASE WHEN EXISTS(SELECT 1 FROM history WHERE dirname="\2" AND filename="\3" AND freq=0 LIMIT 1) THEN 1 ELSE "\2/\3" END;_' | $SQLITE | fgrep -v -x 1 | (
 		if test -n "$FIX"; then
 			cd "$BACKUP_CURRENT"
@@ -92,7 +84,6 @@ current2db ()
 
 old2db ()
 {
-	echo "Checking old FS => DB"
 	if test -n "$FIX"; then
 		/usr/bin/find "$BACKUP_MAIN" \( -type f -o -type l \) -printf '%s %P\n' | sed '
 		/"/d;
@@ -115,8 +106,6 @@ old2db ()
 
 current2old ()
 {
-	echo "Checking current FS => old FS"
-
 	/usr/bin/find "$BACKUP_CURRENT" \( -type f -o -type l \) -printf '%i %P\n' | while read inode fullname; do
 		ls -i "$BACKUP_MAIN/$fullname" 2>/dev/null | grep -q "^ *$inode " || echo "$fullname"
 	done | (
@@ -141,7 +130,6 @@ current2old ()
 
 db_overlaps ()
 {
-	echo "Checking overlapping dates in DB"
 	cmd="	echo '.timeout 10000'
 		echo 'BEGIN TRANSACTION;'
 		while test \$# -ge 1; do
@@ -174,12 +162,10 @@ db_overlaps ()
 db_order ()
 {
 	if test -n "$FIX"; then
-		echo "Deleting where created not < deleted in DB"
 		$SQLITE "DELETE
 			FROM history
 			WHERE created >= deleted;"
 	else
-		echo "Checking that created < deleted in DB"
 		$SQLITE "SELECT *
 			FROM history
 			WHERE created >= deleted;" >check.db_order
@@ -189,10 +175,8 @@ db_order ()
 db_dups_created ()
 {
 	if test -n "$DELETE_MISSING"; then
-		echo "Deleting duplicate DB entries with same created"
 		operation="DELETE"
 	else
-		echo "Checking duplicate DB entries with same created"
 		operation="SELECT *"
 	fi
 	$SQLITE "$operation FROM history
@@ -216,7 +200,6 @@ db_dups_created ()
 
 db_dups_freq0 ()
 {
-	echo "Checking duplicate DB entries which still exist"
 	$SQLITE "SELECT a.*, b.created
 		FROM history AS a,
 		history AS b
@@ -231,7 +214,6 @@ db_dups_freq0 ()
 db_freq ()
 {
 	if test -n "$DELETE_MISSING"; then
-		echo "Fixing freq in DB"
 		$SQLITE "UPDATE history
 			SET freq = CASE
 				WHEN strftime('%Y-%m', created, '-1 minute') !=
@@ -250,7 +232,6 @@ db_freq ()
 			END
 			WHERE freq != 0;"
 	else
-		echo "Checking freq in DB"
 		$SQLITE "SELECT *
 			FROM history
 			WHERE freq != 0 AND
@@ -272,32 +253,38 @@ db_freq ()
 	fi
 }
 
+check () {
+	echo ===== $1 =====
+	$1
+	test -s check.$1 && head check.$1
+}
+
 test -e check.sh && exit 3
 rm check.*
 
 $SQLITE "CREATE INDEX IF NOT EXISTS check_tmp ON history(dirname, filename, created);"
 
 # Tests that might delete some DB rows
-db_order
-db2current
-db2old
-db_dups_created
+check db_order
+check db2current
+check db2old
+check db_dups_created
 
-# Tests that might change created
-db_overlaps
+# Tests that might add new rows with wrong freq
+check old2db
+
+# Tests that might change created (and invalidate freq)
+check db_overlaps
 
 # Tests that fix freq according to created/deleted
-db_freq
+check db_freq
 
 # Tests that remove files from files.txt
-current2db
-current2old
-
-# Tests that delete files for missing DB rows
-old2db
+check current2db
+check current2old
 
 # This test should never fail
-db_dups_freq0
+check db_dups_freq0
 
 $SQLITE "DROP INDEX IF EXISTS check_tmp;VACUUM;ANALYZE;"
 
