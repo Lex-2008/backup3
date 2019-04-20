@@ -41,22 +41,24 @@ check_space()
 
 check_space || exit 0 # no cleanup needed
 
+sql="SELECT dirname || '/' || filename || '/' || created || '$BACKUP_TIME_SEP' || deleted,
+		freq*(strftime('%s', 'now')-strftime('%s', deleted)) AS age,
+		rowid
+	FROM history
+	WHERE freq != 0
+	ORDER BY age DESC;"
+
 cmd="	echo '.timeout 10000'
 	echo 'BEGIN TRANSACTION;'
 	while test \$# -ge 1; do
+		test \"\$(df -PB1 '$BACKUP_MAIN' | awk 'FNR==2{print \$4}')\" -lt $FREE_SPACE_NEEDED || break
 		filename=\"\${1%%|*}\"
 		rowid=\"\${1##*|}\"
 		rm -f \"$BACKUP_MAIN/\$filename\"
 		echo \"DELETE FROM history WHERE rowid='\$rowid';\"
-		test \"\$(df -PB1 '$BACKUP_MAIN' | awk 'FNR==2{print \$4}')\" -lt $FREE_SPACE_NEEDED || break
 		shift
 	done
 	echo 'END TRANSACTION;'"
 
 # uses 'timeline' index to get rows with freq!=0, then builds a new index for age
-$SQLITE "SELECT dirname || '/' || filename || '/' || created || '$BACKUP_TIME_SEP' || deleted,
-		freq*(strftime('%s', 'now')-strftime('%s', deleted)) AS age,
-		rowid
-	FROM history
-	WHERE freq != 0
-	ORDER BY age DESC;" | tr '\n' '\0' | xargs -0 sh -c "$cmd" x | $SQLITE
+$SQLITE "$sql" | tr '\n' '\0' | xargs -0 sh -c "$cmd" x | $SQLITE
