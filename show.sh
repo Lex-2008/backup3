@@ -7,9 +7,9 @@
 # to hard-link files from "stuff" directory in backup to /tmp/dir
 
 test -z "$BACKUP_ROOT"    && exit 2
-
 test -z "$BACKUP_MAIN"    && BACKUP_MAIN=$BACKUP_ROOT/data
 test -z "$BACKUP_DB"      && BACKUP_DB=$BACKUP_ROOT/backup.db
+test -z "$BACKUP_TIME_SEP" && BACKUP_TIME_SEP="~"
 
 SHOW_DATE="$1"
 SHOW_DIR="$2"
@@ -19,12 +19,22 @@ SQLITE="sqlite3 $BACKUP_DB"
 
 rm -rf "$SHOW_IN"
 
-$SQLITE "PRAGMA case_sensitive_like = ON;
-	SELECT dirname, filename, created
+sql="PRAGMA case_sensitive_like = ON;
+	SELECT	dirname || '/' || filename,
+		created || '$BACKUP_TIME_SEP' || deleted,
 	FROM history
 	WHERE dirname LIKE '$SHOW_DIR%'
 	  AND created <= '$SHOW_DATE'
-	  AND deleted > '$SHOW_DATE';" | while IFS='|' read dirname filename created; do
-	mkdir -p "$SHOW_IN"/"$dirname"
-	ln "$BACKUP_MAIN/$dirname/$filename/$created" "$SHOW_IN/$dirname/$filename"
-done
+	  AND deleted > '$SHOW_DATE';"
+
+cmd="
+	while test \$# -ge 1; do
+		fullname=\"\${1%|*}\"
+		times=\"\${1#|*}\"
+		mkdir -p \"$SHOW_IN/\$(dirname \"\$fullname\")\"
+		ln \"$BACKUP_MAIN/\$fullname/\$times\" \"$SHOW_IN/\$fullname\"
+		shift
+	done
+"
+
+$SQLITE "$sql" | tr '\n' '\0' | xargs -0 sh -c "$cmd" x | $SQLITE
