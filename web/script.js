@@ -274,15 +274,15 @@ render=()=>{
 						return child.created <= time && child.deleted>time;
 					}).map(a=>`<a class="dir" href="#${path}/${a}|${time}">${a}</a>`).join('')
 				)+(($('#file_show').checked)?(
-						a.split('\n').filter(a=>!!a).map(a=>a.split('|')).map(a=>
+						a.split('\n').filter(a=>!!a).sort().map(a=>a.split('|')).map(a=>
 							`<a class="file" href="#${path}|${time}|${a[0]}">${a[0]}</a>`
 						).join('')
 					):pass?(
-						a.split('\n').filter(a=>!!a).map(a=>a.split('|')).map(a=>
+						a.split('\n').filter(a=>!!a).sort().map(a=>a.split('|')).map(a=>
 							`<a class="file" href="#${path}|${time}|${a[0]}|${a[1]}">${a[0]}</a>`
 						).join('')
 				       ):(
-						a.split('\n').filter(a=>!!a).map(a=>a.split('|')).map(a=>
+						a.split('\n').filter(a=>!!a).sort().map(a=>a.split('|')).map(a=>
 							`<a class="file" href="/cgi-bin/api.sh?|get|${path}|${a[1]}|${a[0]}">${a[0]}</a>`
 						).join('')
 				));
