@@ -7,6 +7,8 @@ test -z "$BACKUP_MAIN"    && BACKUP_MAIN=$BACKUP_ROOT/data
 test -z "$BACKUP_SHOW"    && BACKUP_SHOW=$BACKUP_ROOT/show
 test -z "$BACKUP_PASS"    && BACKUP_PASS=$BACKUP_ROOT/pass.txt
 test -z "$BACKUP_DB"      && BACKUP_DB=$BACKUP_ROOT/backup.db
+test -z "$BACKUP_TIME_SEP" && BACKUP_TIME_SEP="~"
+test -z "$BACKUP_TIME_NOW" && BACKUP_TIME_NOW=now
 
 SQLITE="sqlite3 $BACKUP_DB"
 
@@ -113,7 +115,7 @@ case "$request" in
 		echo "HTTP/1.0 200 OK"
 		echo "Cache-Control: max-age=600"
 		echo
-		$SQLITE "SELECT filename, created
+		$SQLITE "SELECT filename, created || '$BACKUP_TIME_SEP' || deleted
 			FROM history
 			WHERE dirname = '$dir'
 			  AND created <= '$date'
@@ -148,6 +150,8 @@ case "$request" in
 		echo "HTTP/1.0 200 OK"
 		echo "Cache-Control: max-age=600"
 		echo
+		echo "$BACKUP_TIME_SEP"
+		echo "$BACKUP_TIME_NOW"
 		$SQLITE "SELECT created, deleted, freq, size
 			FROM history
 			WHERE dirname = '$dir'

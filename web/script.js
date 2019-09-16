@@ -307,8 +307,11 @@ render=()=>{
 fileDetails=(name)=>{
 	var freq={0:'Сейчас',1:'Месяц',5:'Неделя',30:'День',720:'Час',8640:'Часто'};
 	api(`ll|${path}||${name}`).then(a=>{
-		$('#file_list').innerHTML=a.split('\n').filter(a=>!!a).map(a=>a.split('|')).map(a=>
-				`<tr><td><a href="#${path}|${time}|${name}|${a[0]}">${name}</a></td><td>${a[3]}</td><td>${a[0]}</td><td>${a[1].startsWith('9999')?' ':a[1]}</td><td>${freq[a[2]]}</td></tr>`
+			a=a.split('\n').filter(a=>!!a);
+			var sep=a.shift();
+			var now=a.shift();
+		$('#file_list').innerHTML=a.sort().map(a=>a.split('|')).map(a=>
+				`<tr><td><a href="#${path}|${time}|${name}|${a[0]}${sep}${a[1]}">${name}</a></td><td>${a[3]}</td><td>${a[0]}</td><td>${a[1]==now?' ':a[1]}</td><td>${freq[a[2]]}</td></tr>`
 				).join('');
 		$('#file_group').style.display='';
 	});
