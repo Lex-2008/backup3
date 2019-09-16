@@ -224,6 +224,7 @@ fillTimeline=(backup)=>{
 		freqtimes.forEach(a=>ft[a]=1);
 		ft=Object.keys(ft).sort();
 		var j=0;
+		timeline=[];
 		for(var i=0;i<ft.length;i++){
 			if(changes[j]>ft[i]){
 				continue;
