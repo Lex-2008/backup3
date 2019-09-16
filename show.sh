@@ -21,7 +21,7 @@ rm -rf "$SHOW_IN"
 
 sql="PRAGMA case_sensitive_like = ON;
 	SELECT	dirname || '/' || filename,
-		created || '$BACKUP_TIME_SEP' || deleted,
+		created || '$BACKUP_TIME_SEP' || deleted
 	FROM history
 	WHERE dirname LIKE '$SHOW_DIR%'
 	  AND created <= '$SHOW_DATE'
@@ -30,7 +30,7 @@ sql="PRAGMA case_sensitive_like = ON;
 cmd="
 	while test \$# -ge 1; do
 		fullname=\"\${1%|*}\"
-		times=\"\${1#|*}\"
+		times=\"\${1#*|}\"
 		mkdir -p \"$SHOW_IN/\$(dirname \"\$fullname\")\"
 		ln \"$BACKUP_MAIN/\$fullname/\$times\" \"$SHOW_IN/\$fullname\"
 		shift
