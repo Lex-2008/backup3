@@ -266,6 +266,3 @@ More clean command (which checks only copies of same files) is like this:
 
 It runs `rdfind` multiple times, once for each file in "current" backup dir,
 checking for duplicates among copies of this file.
-
-After that, it is recommended to run `dedup.sh` script which remove duplicate
-hardlinks for consecutive DB entries.
