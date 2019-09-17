@@ -55,7 +55,7 @@ run_rsync()
 # run
 command -v run_this >/dev/null && run_this
 
-### BACKUP ###
+### COMPARE ###
 
 mkfifo "$BACKUP_FIFO.new"
 mkfifo "$BACKUP_FIFO.new.sql"

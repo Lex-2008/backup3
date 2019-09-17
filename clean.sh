@@ -41,6 +41,8 @@ check_space()
 
 check_space || exit 0 # no cleanup needed
 
+# Uses 'timeline' index to get rows with freq!=0, then builds a temporary index for age.
+# We can't have this index permanently, since it depends on _current_ time
 sql="SELECT dirname || '/' || filename || '/' || created || '$BACKUP_TIME_SEP' || deleted,
 		freq*(strftime('%s', 'now')-strftime('%s', deleted)) AS age,
 		rowid
@@ -60,5 +62,4 @@ cmd="	echo '.timeout 10000'
 	done
 	echo 'END TRANSACTION;'"
 
-# uses 'timeline' index to get rows with freq!=0, then builds a new index for age
 $SQLITE "$sql" | tr '\n' '\0' | xargs -0 sh -c "$cmd" x | $SQLITE
