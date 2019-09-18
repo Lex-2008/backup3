@@ -119,7 +119,7 @@ cmd="cd \"$BACKUP_MAIN\"
 mkdir -p \"\$@\"
 while test \$# -ge 1; do
 	echo \"\$1\" >>\"$BACKUP_LOG\".new
-	ln -T \"$BACKUP_CURRENT/\$1\" \"$BACKUP_MAIN/\$1/$BACKUP_TIME$BACKUP_TIME_SEP$BACKUP_TIME_NOW\"
+	ln \"$BACKUP_CURRENT/\$1\" \"$BACKUP_MAIN/\$1/$BACKUP_TIME$BACKUP_TIME_SEP$BACKUP_TIME_NOW\"
 	shift
 done"
 rm "$BACKUP_LOG".new
