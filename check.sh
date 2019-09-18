@@ -284,10 +284,7 @@ check () {
 	echo ===== $1 =====
 	$1
 	test -s check.$1 || return
-	echo xxx
 	head check.$1
-	echo continue?
-	read
 }
 
 if test -e check.sh; then
