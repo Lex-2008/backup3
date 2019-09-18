@@ -259,7 +259,10 @@ check () {
 	test -s check.$1 && head check.$1
 }
 
-test -e check.sh && exit 3
+if test -e check.sh; then
+	cd "$BACKUP_ROOT"
+	test -e check.sh && exit 3
+fi
 rm check.*
 
 $SQLITE "CREATE INDEX IF NOT EXISTS check_tmp ON history(dirname, filename, created);"
