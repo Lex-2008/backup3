@@ -15,14 +15,11 @@ test -z "$BACKUP_DB"      && BACKUP_DB=$BACKUP_ROOT/backup.db
 test -n "$BACKUP_TIME"    && BACKUP_TIME="$(date -d "$BACKUP_TIME" +"%F %H:%M")"
 test -z "$BACKUP_TIME"    && BACKUP_TIME="$(date +"%F %H:%M")"
 test -z "$BACKUP_TIMEOUT" && BACKUP_TIMEOUT="3600" # 1h
-test -z "$BACKUP_TIME_SEP" && BACKUP_TIME_SEP="~"
+test -z "$BACKUP_TIME_SEP" && BACKUP_TIME_SEP="~" # must be regexp-safe
 test -z "$BACKUP_TIME_NOW" && BACKUP_TIME_NOW=now # must be 'now' or valid date in future
 test -z "$BACKUP_MAX_FREQ" && BACKUP_MAX_FREQ=8640
 
 SQLITE="sqlite3 $BACKUP_DB"
-
-NL='
-'
 
 # exit if there is another copy of this script running
 exec 200>"$BACKUP_FLOCK"
@@ -30,7 +27,7 @@ flock -n 200 || exit 200
 
 ### RSYNC ###
 
-# run rsync to backup from $1 to $2, with $3 extra arguments
+# run rsync to backup every $1 from $2 to $3, with $3 extra arguments
 run_rsync()
 {
 	when="$1"
