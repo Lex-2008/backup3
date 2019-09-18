@@ -18,9 +18,9 @@ test -z "$BACKUP_MAX_FREQ" && BACKUP_MAX_FREQ=8640
 
 SQLITE="sqlite3 $BACKUP_DB"
 
-# exit if there is backup in progress
+# wait for lock to be available
 exec 200>"$BACKUP_FLOCK"
-flock -n 200 || exit 200
+flock 200 || exit 200
 
 if test "$1" = '--fix'; then
 	FIX=1
