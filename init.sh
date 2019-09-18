@@ -19,8 +19,7 @@ $SQLITE "CREATE TABLE history(
 	filename TEXT NOT NULL,
 	created TEXT NOT NULL,
 	deleted TEXT NOT NULL,
-	freq INTEGER NOT NULL,
-	size INTEGER NOT NULL);
+	freq INTEGER NOT NULL);
 CREATE INDEX history_update
 	ON history(dirname, filename)
 	WHERE freq = 0;

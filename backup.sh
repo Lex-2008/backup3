@@ -57,68 +57,39 @@ command -v run_this >/dev/null && run_this
 
 ### COMPARE ###
 
-mkfifo "$BACKUP_FIFO.new"
-mkfifo "$BACKUP_FIFO.new.sql"
-mkfifo "$BACKUP_FIFO.new.files"
-mkfifo "$BACKUP_FIFO.old"
-mkfifo "$BACKUP_FIFO.old.sql"
-mkfifo "$BACKUP_FIFO.old.files"
-
 # listing all files together with their inodes currently in backup dir
 # note that here we use "real" find, because the busybox one doesn't have "-printf"
-# if changing, copypaste to rebuild.sh
+# Note: if changing, copypaste to rebuild.sh
 /usr/bin/find "$BACKUP_CURRENT" $BACKUP_FIND_FILTER \( -type f -o -type l \) -printf '%i %P\0' | LC_ALL=POSIX sort -z >"$BACKUP_LIST".new
 
 # Add empty file if it's missing so comm doesn't complain
 touch "$BACKUP_LIST"
 
+mkfifo "$BACKUP_FIFO.sql"
+mkfifo "$BACKUP_FIFO.files.new"
+mkfifo "$BACKUP_FIFO.files.old"
+
 # comparing this list to its previous version
-LC_ALL=POSIX comm -z -3 "$BACKUP_LIST" "$BACKUP_LIST".new | tee "$BACKUP_FIFO.new" >"$BACKUP_FIFO.old" &
+LC_ALL=POSIX comm -z -3 "$BACKUP_LIST" "$BACKUP_LIST".new | tee "$BACKUP_FIFO.sql" "$BACKUP_FIFO.files.new" >"$BACKUP_FIFO.files.old" &
 
-# note that here we use "real" sed, because the busybox one doesn't have "-z"
+# Note that here we use "real" sed, because the busybox one doesn't have "-z"
 
-### NEW FILES ###
+### SQL ###
+# * new files: add to db
+# * old files: set deleted time and freq
 
-/bin/sed -z '/^\t/!d;     # delete lines not starting with TAB
-	/"/d;             # delete lines with double-quotes in filenames
-	s/^\t[0-9]* //;   # delete tab and inode number
-	' "$BACKUP_FIFO.new" | tee "$BACKUP_FIFO.new.sql" >"$BACKUP_FIFO.new.files" &
-
-# SQL query for new files
-cd "$BACKUP_CURRENT" # to pass relative pathnames to stat
-xargs -r -0 stat -c "%s %n" <"$BACKUP_FIFO.new.sql" | sed '
+/bin/sed -r -z "
 	1i .timeout 10000
-	1i PRAGMA synchronous=normal;
-	'"s/'/''/g"'      # duplicate single quotes
-	/^[^/]*$/s_ _ /_; # ensure all lines have dir separator
-	s_\([0-9]*\) \(.*\)/\(.*\)_	\
-		INSERT INTO history (dirname, filename, created, deleted, freq, size)	\
-		VALUES '"('\\2', '\\3', '$BACKUP_TIME', '$BACKUP_TIME_NOW', 0, '\\1')"';_
-	' | $SQLITE &
-cd - >/dev/null
-
-# operate on new files
-cmd="cd \"$BACKUP_MAIN\"
-mkdir -p \"\$@\"
-while test \$# -ge 1; do
-	ln -T \"$BACKUP_CURRENT/\$1\" \"$BACKUP_MAIN/\$1/$BACKUP_TIME$BACKUP_TIME_SEP$BACKUP_TIME_NOW\"
-	shift
-done" 
-<"$BACKUP_FIFO.new.files" xargs -r -0 sh -c "$cmd" x &
-
-### OLD FILES ###
-
-/bin/sed -z '/^\t/d;      # delete lines starting with TAB
-	/"/d;             # delete lines with double-quotes in filenames
-	s/^[0-9]* //;     # delete inode number
-	'"s/'/''/g"'      # duplicate single quotes
-	/^[^/]*$/s_^_/_;  # ensure all lines have dir separator
-	' "$BACKUP_FIFO.old" | tee "$BACKUP_FIFO.old.sql" >"$BACKUP_FIFO.old.files" &
-
-# SQL query for old files
-/bin/sed -z '1i .timeout 10000
-	1i PRAGMA synchronous=normal;
-	s_\(.*\)/\(.*\)_'"	\\
+	1i BEGIN TRANSACTION;
+	\$a END TRANSACTION;
+	# /\"/d;     # delete lines with double-quotes in filenames
+	s/'/''/g   # duplicate single quotes
+	/^\\t/{    # lines starting with TAB means new file
+		s_^\\t[0-9]* ((.*)/)?(.*)_	\\
+			INSERT INTO history (dirname, filename, created, deleted, freq)	\\
+			VALUES ('\\2', '\\3', '$BACKUP_TIME', '$BACKUP_TIME_NOW', 0);	\\
+		_;p;d}
+	s_^[0-9]* ((.*)/)?(.*)_	\\
 		UPDATE history	\\
 		SET 	deleted = '$BACKUP_TIME',	\\
 			freq = CASE	\\
@@ -136,28 +107,49 @@ done"
 				     THEN 720 -- different hour	\\
 				ELSE $BACKUP_MAX_FREQ		\\
 			END			\\
-		WHERE dirname = '\\1'		\\
-		  AND filename = '\\2'		\\
+		WHERE dirname = '\\2'		\\
+		  AND filename = '\\3'		\\
 		  AND created != '$BACKUP_TIME'	\\
-		  AND freq = 0;_"'
-	' "$BACKUP_FIFO.old.sql" | tr '\0' '\n' | $SQLITE &
+		  AND freq = 0;_
+	" "$BACKUP_FIFO.sql" | tr '\0' '\n' | $SQLITE &
 
-# operate on old files
+### NEW FILES ###
+# hardlink from BACKUP_CURRENT to BACKUP_MAIN
+
+cmd="cd \"$BACKUP_MAIN\"
+mkdir -p \"\$@\"
+while test \$# -ge 1; do
+	ln -T \"$BACKUP_CURRENT/\$1\" \"$BACKUP_MAIN/\$1/$BACKUP_TIME$BACKUP_TIME_SEP$BACKUP_TIME_NOW\"
+	shift
+done"
+
+/bin/sed -z '/^\t/!d;     # delete lines NOT starting with TAB
+	# /"/d;             # delete lines with double-quotes in filenames
+	s_^\t[0-9]* __   # delete inode number
+	' "$BACKUP_FIFO.files.new" | xargs -r -0 sh -c "$cmd" x &
+
+### OLD FILES ###
+# * ask database for created date
+# * add current date to filename
+
 cmd="cd \"$BACKUP_MAIN\"
 while test \$# -ge 1; do
-	mv \"\$1$BACKUP_TIME_SEP$BACKUP_TIME_NOW\" \"\$1$BACKUP_TIME_SEP$BACKUP_TIME\"
+	mv \"./\$1$BACKUP_TIME_SEP$BACKUP_TIME_NOW\" \"./\$1$BACKUP_TIME_SEP$BACKUP_TIME\"
 	shift
 done" 
-/bin/sed -z '1i .timeout 10000
-	s_\(.*\)/\(.*\)_'"			\\
+
+/bin/sed -r -z "/^\\t/d;   # delete lines starting with TAB
+	# /\"/d;             # delete lines with double-quotes in filenames
+	s/'/''/g           # duplicate single quotes
+	s_^[0-9]* ((.*)/)?(.*)_	\\
 		SELECT dirname || '/' || filename || '/' || created	\\
 		FROM history			\\
-		WHERE dirname = '\\1'		\\
-		  AND filename = '\\2'		\\
+		WHERE dirname = '\\2'		\\
+		  AND filename = '\\3'		\\
 		  AND created != '$BACKUP_TIME'	\\
 		  AND (freq = 0			\\
-		    OR deleted = '$BACKUP_TIME');_"'
-	' "$BACKUP_FIFO.old.files" | tr '\0' '\n' | $SQLITE | tr '\n' '\0' | xargs -r -0 sh -c "$cmd" x &
+		    OR deleted = '$BACKUP_TIME');_
+	" "$BACKUP_FIFO.files.old" | tr '\0' '\n' | $SQLITE | tr '\n' '\0' | xargs -r -0 sh -c "$cmd" x &
 
 # wait for all background activity to finish
 wait
