@@ -80,6 +80,7 @@ LC_ALL=POSIX comm -z -3 "$BACKUP_LIST" "$BACKUP_LIST".new | tee "$BACKUP_FIFO.sq
 	1i .timeout 10000
 	1i BEGIN TRANSACTION;
 	\$a END TRANSACTION;
+	\$a PRAGMA optimize;
 	# /\"/d;     # delete lines with double-quotes in filenames
 	s/'/''/g   # duplicate single quotes
 	/^\\t/{    # lines starting with TAB means new file

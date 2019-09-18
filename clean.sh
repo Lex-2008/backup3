@@ -60,6 +60,7 @@ cmd="	echo '.timeout 10000'
 		echo \"DELETE FROM history WHERE rowid='\$rowid';\"
 		shift
 	done
-	echo 'END TRANSACTION;'"
+	echo 'END TRANSACTION;'
+	echo 'PRAGMA optimize;'"
 
 $SQLITE "$sql" | tr '\n' '\0' | xargs -0 sh -c "$cmd" x | $SQLITE
