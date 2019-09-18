@@ -311,7 +311,8 @@ fileDetails=(name)=>{
 			var sep=a.shift();
 			var now=a.shift();
 		$('#file_list').innerHTML=a.sort().map(a=>a.split('|')).map(a=>
-				`<tr><td><a href="#${path}|${time}|${name}|${a[0]}${sep}${a[1]}">${name}</a></td><td>${a[3]}</td><td>${a[0]}</td><td>${a[1]==now?' ':a[1]}</td><td>${freq[a[2]]}</td></tr>`
+				// a[0]=created, a[1]=deleted, a[2]=freq
+				`<tr><td><a href="#${path}|${time}|${name}|${a[0]}${sep}${a[1]}">${name}</a></td><td>${a[0]}</td><td>${a[1]==now?' ':a[1]}</td><td>${freq[a[2]]}</td></tr>`
 				).join('');
 		$('#file_group').style.display='';
 	});

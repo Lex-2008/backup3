@@ -152,7 +152,7 @@ case "$request" in
 		echo
 		echo "$BACKUP_TIME_SEP"
 		echo "$BACKUP_TIME_NOW"
-		$SQLITE "SELECT created, deleted, freq, size
+		$SQLITE "SELECT created, deleted, freq
 			FROM history
 			WHERE dirname = '$dir'
 			  AND filename = '$file';"
