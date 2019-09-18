@@ -100,7 +100,19 @@ old2db ()
 				LIMIT 1);	\
 			_' | $SQLITE
 	else
-		/usr/bin/find "$BACKUP_MAIN" \( -type f -o -type l \) -printf '%P\n' | sed '/"/d;s_^\(\(.*\)/\)\?\(.*\)/\(.*\)'"$BACKUP_TIME_SEP"'\(.*\)$_SELECT CASE WHEN EXISTS(SELECT 1 FROM history WHERE dirname="\2" AND filename="\3" AND created="\4" AND deleted="\5" LIMIT 1) THEN 1 ELSE "\2/\3/\4'"$BACKUP_TIME_SEP"'\5" END;_' | $SQLITE | fgrep -v -x 1 >"$BACKUP_ROOT/check.old2db"
+		/usr/bin/find "$BACKUP_MAIN" \( -type f -o -type l \) -printf '%P\0' | /bin/sed -z -r "
+		/\"/d;
+		s_^((.*)/)?(.*)/(.*)$BACKUP_TIME_SEP(.*)\$_	\\
+		SELECT CASE WHEN EXISTS	\\
+		  (SELECT 1	\\
+		   FROM history	\\
+		   WHERE dirname='\\2'	\\
+		     AND filename='\\3'	\\
+		     AND created='\\4'	\\
+		     AND deleted='\\5'	\\
+		   LIMIT 1) THEN 1	\\
+                  ELSE '\\1\\3/\\4$BACKUP_TIME_SEP\\5'	\\
+		  END;_" | tee old2db.sql | $SQLITE | fgrep -v -x 1 >"$BACKUP_ROOT/check.old2db"
 	fi
 }
 
@@ -256,7 +268,11 @@ db_freq ()
 check () {
 	echo ===== $1 =====
 	$1
-	test -s check.$1 && head check.$1
+	test -s check.$1 || return
+	echo xxx
+	head check.$1
+	echo continue?
+	read
 }
 
 if test -e check.sh; then
@@ -265,7 +281,7 @@ if test -e check.sh; then
 fi
 rm check.*
 
-$SQLITE "CREATE INDEX IF NOT EXISTS check_tmp ON history(dirname, filename, created);"
+$SQLITE "CREATE INDEX IF NOT EXISTS check_tmp ON history(dirname, filename, created);ANALYZE;"
 
 # Tests that might delete some DB rows
 check db_order
@@ -289,6 +305,6 @@ check current2old
 # This test should never fail
 check db_dups_freq0
 
-$SQLITE "DROP INDEX IF EXISTS check_tmp;VACUUM;ANALYZE;"
+$SQLITE "DROP INDEX IF EXISTS check_tmp;VACUUM;"
 
 wc -l check.*
