@@ -124,6 +124,21 @@ old2db ()
 	fi
 }
 
+old2current ()
+{
+	cmd="	len=
+		while test \$# -ge 1; do
+			# remove $BACKUP_MAIN prefix from filename
+			filename=\"\${1:${#BACKUP_MAIN}}\"
+			if ! test -f \"$BACKUP_CURRENT/\$filename\"; then
+				echo \"$filename\"
+				test -n \"$FIX\" && ln \"\$1\" \"$BACKUP_CURRENT/\$filename\"
+			fi
+			shift
+		done"
+	/usr/bin/find "$BACKUP_MAIN" \( -type f -o -type l \) -name "*$BACKUP_TIME_SEP$BACKUP_TIME_NOW" -printf '%h\0' | xargs -0 sh -c "$cmd" x
+}
+
 current2old ()
 {
 	cmd="	while test \$# -ge 1; do
@@ -294,6 +309,9 @@ fi
 rm check.*
 
 $SQLITE "CREATE INDEX IF NOT EXISTS check_tmp ON history(dirname, filename, created);ANALYZE;"
+
+# Tests that might add new files in current
+check old2current
 
 # Tests that might delete some DB rows
 check db_order
