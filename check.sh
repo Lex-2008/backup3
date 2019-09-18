@@ -257,11 +257,11 @@ db_freq ()
 				     THEN 720 -- different hour
 				ELSE $BACKUP_MAX_FREQ
 			END
-			WHERE freq != 0;"
+			WHERE deleted != '$BACKUP_TIME_NOW';"
 	else
 		$SQLITE "SELECT *
 			FROM history
-			WHERE freq != 0 AND
+			WHERE deleted != '$BACKUP_TIME_NOW' AND
 			freq != CASE
 				WHEN strftime('%Y-%m', created, '-1 minute') !=
 				     strftime('%Y-%m', deleted, '-1 minute')
