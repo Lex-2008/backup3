@@ -250,7 +250,7 @@ similar files to each other:
 
 	cd "$BACKUP_ROOT"
 	rdfind -ignoreempty false -removeidentinode false -makehardlinks true current data
-	find current \( -type f -o -type l \) -printf '%i %P\n' | LC_ALL=POSIX sort >files.txt
+	find current \( -type f -o -type l \) -printf '%i %P\0' | LC_ALL=POSIX sort -z >files.txt
 
 Last command updates files.txt with inodes of new files. Note, however, that
 above command changes timestamps of some files in "current" backup dir, so

@@ -57,7 +57,7 @@ command -v run_this >/dev/null && run_this
 
 # listing all files together with their inodes currently in backup dir
 # note that here we use "real" find, because the busybox one doesn't have "-printf"
-# Note: if changing, copypaste to rebuild.sh
+# Note: if changing, copypaste to rebuild.sh and README.md (in rdfind section)
 /usr/bin/find "$BACKUP_CURRENT" $BACKUP_FIND_FILTER \( -type f -o -type l \) -printf '%i %P\0' | LC_ALL=POSIX sort -z >"$BACKUP_LIST".new
 
 # Add empty file if it's missing so comm doesn't complain
