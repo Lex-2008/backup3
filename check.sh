@@ -258,6 +258,8 @@ db_freq ()
 	if test -n "$FIX"; then
 		$SQLITE "UPDATE history
 			SET freq = CASE
+				WHEN deleted = '$BACKUP_TIME_NOW'
+				     THEN 0 -- not deleted yet
 				WHEN strftime('%Y-%m', created, '-1 minute') !=
 				     strftime('%Y-%m', deleted, '-1 minute')
 				     THEN 1 -- different month
@@ -271,13 +273,13 @@ db_freq ()
 				     strftime('%Y-%m-%d %H', deleted, '-1 minute')
 				     THEN 720 -- different hour
 				ELSE $BACKUP_MAX_FREQ
-			END
-			WHERE deleted != '$BACKUP_TIME_NOW';"
+			END;"
 	else
 		$SQLITE "SELECT *
 			FROM history
-			WHERE deleted != '$BACKUP_TIME_NOW' AND
-			freq != CASE
+			WHERE freq != CASE
+				WHEN deleted = '$BACKUP_TIME_NOW'
+				     THEN 0 -- not deleted yet
 				WHEN strftime('%Y-%m', created, '-1 minute') !=
 				     strftime('%Y-%m', deleted, '-1 minute')
 				     THEN 1 -- different month
