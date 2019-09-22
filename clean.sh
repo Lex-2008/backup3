@@ -15,6 +15,8 @@ test -z "$BACKUP_MAIN"    && BACKUP_MAIN=$BACKUP_ROOT/data
 test -z "$BACKUP_DB"      && BACKUP_DB=$BACKUP_ROOT/backup.db
 test -z "$BACKUP_TIME_SEP" && BACKUP_TIME_SEP="~"
 
+test -z "$CLEAN_BY_FREQ"  && CLEAN_BY_FREQ="1" # set to 0 to ignore freq when cleaning
+
 SQLITE="sqlite3 $BACKUP_DB"
 
 NL="
@@ -41,10 +43,16 @@ check_space()
 
 check_space || exit 0 # no cleanup needed
 
+if test "$CLEAN_BY_FREQ" = "1"; then
+	clean_multiplier="freq" # column name
+else
+	clean_multiplier=1 # constant number
+fi
+
 # Uses 'timeline' index to get rows with freq!=0, then builds a temporary index for age.
 # We can't have this index permanently, since it depends on _current_ time
 sql="SELECT dirname || '/' || filename || '/' || created || '$BACKUP_TIME_SEP' || deleted,
-		freq*(strftime('%s', 'now')-strftime('%s', deleted)) AS age,
+		$clean_multiplier*(strftime('%s', 'now')-strftime('%s', deleted)) AS age,
 		rowid
 	FROM history
 	WHERE freq != 0
