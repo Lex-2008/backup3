@@ -141,9 +141,13 @@ while test \$# -ge 1; do
 done" 
 rm "$BACKUP_LOG".old
 
-/bin/sed -r -z "/^\\t/d;   # delete lines starting with TAB
-	# /\"/d;             # delete lines with double-quotes in filenames
-	s/'/''/g           # duplicate single quotes
+/bin/sed -r -z "
+	1i .timeout 10000
+	1i BEGIN TRANSACTION;
+	\$a END TRANSACTION;
+	/^\\t/d;    # delete lines starting with TAB
+	# /\"/d;      # delete lines with double-quotes in filenames
+	s/'/''/g;   # duplicate single quotes
 	s_^[0-9]* ((.*)/)?(.*)_	\\
 		SELECT dirname || '/' || filename || '/' || created	\\
 		FROM history			\\
