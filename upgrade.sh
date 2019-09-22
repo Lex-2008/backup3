@@ -12,6 +12,10 @@ test -z "$BACKUP_FIND_FILTER" # this is fine
 
 SQLITE="sqlite3 $BACKUP_DB"
 
+$SQLITE "UPDATE history
+	SET deleted = '$BACKUP_TIME_NOW'
+	WHERE freq = 0;"
+
 $SQLITE "SELECT dirname,
 		filename,
 		created,
