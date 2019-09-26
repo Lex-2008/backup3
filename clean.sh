@@ -51,7 +51,7 @@ fi
 
 # Uses 'timeline' index to get rows with freq!=0, then builds a temporary index for age.
 # We can't have this index permanently, since it depends on _current_ time
-sql="SELECT dirname || '/' || filename || '/' || created || '$BACKUP_TIME_SEP' || deleted,
+sql="SELECT dirname || '/' || filename || '/' || created,
 		$clean_multiplier*(strftime('%s', 'now')-strftime('%s', deleted)) AS age,
 		rowid
 	FROM history
@@ -64,7 +64,7 @@ cmd="	echo '.timeout 10000'
 		test \"\$(df -PB1 '$BACKUP_MAIN' | awk 'FNR==2{print \$4}')\" -lt $FREE_SPACE_NEEDED || break
 		filename=\"\${1%%|*}\"
 		rowid=\"\${1##*|}\"
-		rm -f \"$BACKUP_MAIN/\$filename\"
+		rm -f \"$BACKUP_MAIN/\$filename\"*
 		echo \"DELETE FROM history WHERE rowid='\$rowid';\"
 		shift
 	done
