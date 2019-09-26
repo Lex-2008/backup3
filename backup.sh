@@ -8,7 +8,6 @@ test -z "$BACKUP_CURRENT" && BACKUP_CURRENT=$BACKUP_ROOT/current
 test -z "$BACKUP_LIST"    && BACKUP_LIST=$BACKUP_ROOT/files.txt
 test -z "$BACKUP_FLOCK"   && BACKUP_FLOCK=$BACKUP_ROOT/lock
 test -z "$BACKUP_FIFO"    && BACKUP_FIFO=$BACKUP_ROOT/fifo
-test -z "$BACKUP_LOG"     && BACKUP_LOG=$BACKUP_ROOT/log
 test -z "$BACKUP_MAIN"    && BACKUP_MAIN=$BACKUP_ROOT/data
 test -z "$BACKUP_RSYNC_LOGS" && BACKUP_RSYNC_LOGS=$BACKUP_ROOT/rsync.logs
 test -z "$BACKUP_FIND_FILTER" # this is fine
@@ -110,7 +109,7 @@ LC_ALL=POSIX comm -z -3 "$BACKUP_LIST" "$BACKUP_LIST".new | tee "$BACKUP_FIFO.sq
 		  AND filename = '\\3'		\\
 		  AND created != '$BACKUP_TIME'	\\
 		  AND freq = 0;_
-	" "$BACKUP_FIFO.sql" | tr '\0' '\n' | tee "$BACKUP_LOG".sql | $SQLITE &
+	" "$BACKUP_FIFO.sql" | tr '\0' '\n' | $SQLITE &
 
 ### NEW FILES ###
 # hardlink from BACKUP_CURRENT to BACKUP_MAIN
@@ -118,11 +117,9 @@ LC_ALL=POSIX comm -z -3 "$BACKUP_LIST" "$BACKUP_LIST".new | tee "$BACKUP_FIFO.sq
 cmd="cd \"$BACKUP_MAIN\"
 mkdir -p \"\$@\"
 while test \$# -ge 1; do
-	echo \"\$1\" >>\"$BACKUP_LOG\".new
 	ln \"$BACKUP_CURRENT/\$1\" \"$BACKUP_MAIN/\$1/$BACKUP_TIME$BACKUP_TIME_SEP$BACKUP_TIME_NOW\"
 	shift
 done"
-rm "$BACKUP_LOG".new
 
 /bin/sed -z '/^\t/!d;     # delete lines NOT starting with TAB
 	# /"/d;             # delete lines with double-quotes in filenames
@@ -135,11 +132,9 @@ rm "$BACKUP_LOG".new
 
 cmd="cd \"$BACKUP_MAIN\"
 while test \$# -ge 1; do
-	echo \"\$1\" >>\"$BACKUP_LOG\".old
 	mv \"./\$1$BACKUP_TIME_SEP$BACKUP_TIME_NOW\" \"./\$1$BACKUP_TIME_SEP$BACKUP_TIME\"
 	shift
 done" 
-rm "$BACKUP_LOG".old
 
 /bin/sed -r -z "
 	1i .timeout 10000
@@ -156,7 +151,7 @@ rm "$BACKUP_LOG".old
 		  AND created != '$BACKUP_TIME'	\\
 		  AND (freq = 0			\\
 		    OR deleted = '$BACKUP_TIME');_
-	" "$BACKUP_FIFO.files.old" | tr '\0' '\n' | tee "$BACKUP_LOG".old.sql | $SQLITE | tr '\n' '\0' | xargs -r -0 sh -c "$cmd" x &
+	" "$BACKUP_FIFO.files.old" | tr '\0' '\n' | $SQLITE | tr '\n' '\0' | xargs -r -0 sh -c "$cmd" x &
 
 # wait for all background activity to finish
 wait
