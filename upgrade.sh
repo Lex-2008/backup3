@@ -56,5 +56,5 @@ if test "$BACKUP_DB_BAK" != "no"; then
 	echo 'Step 5.2: deleting backup.db backups from database'
 	sqlite3 $BACKUP_DB "DELETE FROM history WHERE dirname='' AND filename='$BACKUP_DB_BAK';"
 	echo 'Step 5.2: deleting backup.db from list file'
-	sed -zi '/^[0-9]* backup.db/d' "$BACKUP_LIST"
+	/bin/sed -zi '/^[0-9]* backup.db/d' "$BACKUP_LIST"
 fi
