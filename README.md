@@ -263,28 +263,27 @@ Messing with db
 ### Check that database is correct
 
 It may happen that data in database is out of sync with actual files. To check
-for that, run `check.sh`. To fix it by deleting existing DB records for missing
-files and existing files for missing DB records, run `check.sh --delete`.
+for that, run `check.sh`. To fix it, run `check.sh --fix`. It will correct
+information in the database.
 
-### Rollback backup to previous version
+### Rebuild database from files
 
-In default configuration, backup database is backed up every time, too. To
-restore it, pick one that you like and move it in place of current one
-(`$BACKUP_ROOT/backup.db` by default). After that, run `check.sh --delete` to
-synchronize DB with FS.
+All information in the database is also stored in filenames in backup. To
+rebuild database from files, simply run `rebuild.sh`.
 
 ### Delete files from backup
 
 If you realised that you've backed up some files that you didn't actually want
 to backup (like caches), you can delete them - both from filesystem, like this:
 
-	rm -rf $BACKUP_ROOT/data/home/.cache
+	rm -rf $BACKUP_ROOT/{current,data}/home/.cache
 
 and from database, like this:
 
 	sqlite3 $BACKUP_DB "DELETE FROM history WHERE dirname LIKE 'home/.cache%'"
 
-Or run only one of these two commands, followed by `check.sh --delete`.
+Or run only the first command, followed by `check.sh --fix`. Remember to exclude
+them from the rsync operation - otherwise they will appear in backup again!
 
 ### Clean empty dirs
 
@@ -319,3 +318,9 @@ More clean command (which checks only copies of same files) is like this:
 
 It runs `rdfind` multiple times, once for each file in "current" backup dir,
 checking for duplicates among copies of this file.
+
+### Migrating from "old" (rsync --link-dest) style to current one.
+
+If you used my [previous backup system][1], you can easily migrate to this new
+one with help of `migrate.sh` script. Read its comment on top for usage
+instructions, and also note that it has hardcoded path to `~/backup3/backup.sh`.
