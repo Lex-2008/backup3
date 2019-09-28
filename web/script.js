@@ -310,10 +310,16 @@ fileDetails=(name)=>{
 			a=a.split('\n').filter(a=>!!a);
 			var sep=a.shift();
 			var now=a.shift();
-		$('#file_list').innerHTML=a.sort().map(a=>a.split('|')).map(a=>
 				// a[0]=created, a[1]=deleted, a[2]=freq
+		$('#file_list').innerHTML=pass?(
+				a.sort().map(a=>a.split('|')).map(a=>
 				`<tr><td><a href="#${path}|${time}|${name}|${a[0]}${sep}${a[1]}">${name}</a></td><td>${a[0]}</td><td>${a[1]==now?' ':a[1]}</td><td>${freq[a[2]]}</td></tr>`
-				).join('');
+				).join('')
+			):(
+				a.sort().map(a=>a.split('|')).map(a=>
+				`<tr><td><a href="/cgi-bin/api.sh?|get|${path}|${a[0]}${sep}${a[1]}|${name}">${name}</a></td><td>${a[0]}</td><td>${a[1]==now?' ':a[1]}</td><td>${freq[a[2]]}</td></tr>`
+				).join('')
+			);
 		$('#file_group').style.display='';
 	});
 }
