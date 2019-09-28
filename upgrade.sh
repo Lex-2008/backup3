@@ -4,6 +4,7 @@ test -z "$BACKUP_ROOT"    && exit 2
 
 test -z "$BACKUP_MAIN"    && BACKUP_MAIN=$BACKUP_ROOT/data
 test -z "$BACKUP_DB"      && BACKUP_DB=$BACKUP_ROOT/backup.db
+test -z "$BACKUP_DB_BAK"  && BACKUP_DB_BAK=backup.db
 test -z "$BACKUP_TIME_SEP" && BACKUP_TIME_SEP="~"
 test -z "$BACKUP_TIME_NOW" && BACKUP_TIME_NOW=now
 test -z "$BACKUP_CURRENT" && BACKUP_CURRENT=$BACKUP_ROOT/current
@@ -40,3 +41,13 @@ echo 'Step 4: updating list file'
 # delete file sizes and convert from newline-separated file to zero-separated one
 sed 's/ [0-9]* / /' "$BACKUP_LIST" | tr '\n' '\0' | LC_ALL=POSIX sort -z >"$BACKUP_LIST".new
 mv "$BACKUP_LIST".new "$BACKUP_LIST"
+
+if test "$BACKUP_DB_BAK" != "no"; then
+	echo 'Step 5.1: deleting backup.db backups from filesystem'
+	rm -rf "$BACKUP_MAIN/$BACKUP_DB_BAK"
+	rm -f "$BACKUP_CURRENT/$BACKUP_DB_BAK"
+	echo 'Step 5.2: deleting backup.db backups from database'
+	sqlite3 $BACKUP_DB "DELETE FROM history WHERE dirname='' AND filename='$BACKUP_DB_BAK';"
+	echo 'Step 5.2: deleting backup.db from list file'
+	sed -zi '/^[0-9]* backup.db/d' "$BACKUP_LIST"
+fi
