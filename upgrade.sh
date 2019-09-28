@@ -46,8 +46,7 @@ $SQLITE "SELECT dirname,
 
 echo 'Step 4: updating list file'
 # delete file sizes and convert from newline-separated file to zero-separated one
-sed 's/ [0-9]* / /' "$BACKUP_LIST" | tr '\n' '\0' | LC_ALL=POSIX sort -z >"$BACKUP_LIST".new
-mv "$BACKUP_LIST".new "$BACKUP_LIST"
+sed -i 's/ [0-9]* / /' "$BACKUP_LIST"
 
 if test "$BACKUP_DB_BAK" != "no"; then
 	echo 'Step 5.1: deleting backup.db backups from filesystem'
@@ -56,5 +55,5 @@ if test "$BACKUP_DB_BAK" != "no"; then
 	echo 'Step 5.2: deleting backup.db backups from database'
 	sqlite3 $BACKUP_DB "DELETE FROM history WHERE dirname='' AND filename='$BACKUP_DB_BAK';"
 	echo 'Step 5.2: deleting backup.db from list file'
-	/bin/sed -zi '/^[0-9]* backup.db/d' "$BACKUP_LIST"
+	sed -i '/^[0-9]* backup.db/d' "$BACKUP_LIST"
 fi

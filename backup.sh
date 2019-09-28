@@ -57,7 +57,7 @@ command -v run_this >/dev/null && run_this
 # listing all files together with their inodes currently in backup dir
 # note that here we use "real" find, because the busybox one doesn't have "-printf"
 # Note: if changing, copypaste to rebuild.sh and README.md (in rdfind section)
-/usr/bin/find "$BACKUP_CURRENT" $BACKUP_FIND_FILTER \( -type f -o -type l \) -printf '%i %P\0' | LC_ALL=POSIX sort -z >"$BACKUP_LIST".new
+/usr/bin/find "$BACKUP_CURRENT" $BACKUP_FIND_FILTER \( -type f -o -type l \) -printf '%i %P\n' | LC_ALL=POSIX sort >"$BACKUP_LIST".new
 
 # Add empty file if it's missing so comm doesn't complain
 touch "$BACKUP_LIST"
@@ -67,7 +67,7 @@ mkfifo "$BACKUP_FIFO.files.new"
 mkfifo "$BACKUP_FIFO.files.old"
 
 # comparing this list to its previous version
-LC_ALL=POSIX comm -z -3 "$BACKUP_LIST" "$BACKUP_LIST".new | tee "$BACKUP_FIFO.sql" "$BACKUP_FIFO.files.new" >"$BACKUP_FIFO.files.old" &
+LC_ALL=POSIX comm -3 "$BACKUP_LIST" "$BACKUP_LIST".new | tr '\n' '\0' | tee "$BACKUP_FIFO.sql" "$BACKUP_FIFO.files.new" >"$BACKUP_FIFO.files.old" &
 
 # Note that here we use "real" sed, because the busybox one doesn't have "-z"
 

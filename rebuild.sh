@@ -65,6 +65,6 @@ done"
 
 ### FILES.TXT ###
 
-# from build.sh
-/usr/bin/find "$BACKUP_CURRENT" $BACKUP_FIND_FILTER \( -type f -o -type l \) -printf '%i %P\0' | LC_ALL=POSIX sort -z >"$BACKUP_LIST".new
+# from backup.sh
+/usr/bin/find "$BACKUP_CURRENT" $BACKUP_FIND_FILTER \( -type f -o -type l \) -printf '%i %P\n' | LC_ALL=POSIX sort >"$BACKUP_LIST".new
 mv "$BACKUP_LIST".new "$BACKUP_LIST"
