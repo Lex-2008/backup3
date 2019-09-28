@@ -13,6 +13,13 @@ test -z "$BACKUP_FIND_FILTER" # this is fine
 
 SQLITE="sqlite3 $BACKUP_DB"
 
+echo 'Step 0: backing up'
+bak="$BACKUP_ROOT/pre-migrate"
+mkdir "$bak"
+cp -al "$BACKUP_MAIN" "$bak"
+cp -l "$BACKUP_DB" "$bak"
+cp -l "$BACKUP_LIST" "$bak"
+
 echo 'Step 1: updating deleted timestamps'
 $SQLITE "UPDATE history
 	SET deleted = '$BACKUP_TIME_NOW'
