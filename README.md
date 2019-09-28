@@ -65,6 +65,8 @@ It will create necessary dirs and sqlite database to hold information.
 * find
 * flock
 * smbclient (if using password-protected dirs in WebUI)
+* par2create (if creating par2 files)
+* cpulimit (if limiting cpu usage by par2 process)
 
 
 Simple usage
@@ -116,6 +118,47 @@ above file:
 
 	# delete old versions until at least 10% of disk space is free
 	clean.sh 10 %
+
+### Protecting against bit rot
+
+To protect against [bit rot][], run this command every month after the monthly
+backup:
+
+	par2create.sh 1
+
+It will walk through all files in the last monthly backup and create `*.par2`
+archives for files over 300kb. This feature requires [par2cmdline][] installed
+(usually available in your distro repos).
+Files smaller than 300kb will be just copied to `*.bak` files, because `*.par2`
+files will be bigger than files they are protecting.
+Running `par2create.sh` without arguments will ensure that `*.par2` or `*.bak`
+files exist for all monthly backups, not only for the last one.
+To check if par2 archives are valid and no bit rot happened, run this command:
+
+	par2verify.sh
+
+It has same arguments as `par2create.sh`. To check previous month's `*.par2`
+files, use these arguments:
+
+	par2verify.sh 2 1
+
+If run in September, this command will check `*.par2` files created by
+`par2create.sh 1` command ran in August.
+
+If you have [cpulimit][] installed (usually available in your distro repos),
+you can limit the CPU usage by `par2` process. For example, to make it use
+about 10% of CPU, export this variable before running the
+`par2create.sh`/`par2verify.sh` command:
+
+	export BACKUP_PAR2_CPULIMIT=10
+
+It is especially useful if you use some [fanless][] computer and don't want it
+to overheat under the task.
+
+[bit rot]: https://en.wikipedia.org/wiki/Data_degradation
+[par2cmdline]: https://github.com/parchive/par2cmdline
+[cpulimit]: https://github.com/opsengine/cpulimit
+[fanless]: http://alexey.shpakovsky.ru/en/fanlesstech.html
 
 ### Restore from backup
 
@@ -196,6 +239,16 @@ Fun stuff
 
 Note that `-n` argument for `column` command is a non-standard Debian extension
 
+### Checking how much space `*.par2` files are occupying
+
+If you're wondering how much does the protection against bit rot costs you in
+sense of gigabytes, just run this command: (taken from [this][a322828]
+stackexchange answer):
+
+	find "$BACKUP_ROOT" -type f \( -name '*.bak' -o -name '*.par2' -o -name '*.vol*' \) -printf '%s\n' | gawk -M '{sum+=$1} END {print sum}' | numfmt --to=si
+
+[a322828]: https://unix.stackexchange.com/questions/41550/find-the-total-size-of-certain-files-within-a-directory-branch/322828#322828
+
 ### Getting most frequently changed files
 
 	sqlite3 $BACKUP_DB "SELECT dirname, filename, count(*) AS num FROM history GROUP BY dirname, filename ORDER BY num DESC LIMIT 10;"
@@ -236,12 +289,12 @@ Or run only one of these two commands, followed by `check.sh --delete`.
 ### Clean empty dirs
 
 Especially after above command, you're left with a tree of empty directories in
-`$BACKUP_DATA`. To get rid of them, run this command (taken from [this][a]
+`$BACKUP_DATA`. To get rid of them, run this command (taken from [this][a107556]
 stackexchange answer):
 
 	find $BACKUP_MAIN -type d -empty -delete
 
-[a]: https://unix.stackexchange.com/questions/8430/how-to-remove-all-empty-directories-in-a-subtree/107556#107556
+[a107556]: https://unix.stackexchange.com/questions/8430/how-to-remove-all-empty-directories-in-a-subtree/107556#107556
 
 ### Removing duplicates
 
