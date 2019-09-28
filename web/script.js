@@ -317,7 +317,7 @@ fileDetails=(name)=>{
 		$('#file_group').style.display='';
 	});
 }
-closeFileDetails=function(){
+closeFileDetails=function(e){
 	//ensure that this event fires only when clicking close button or shade
 	if( e.target !== this) return;
 	var time=timeline[$('#q').value];
