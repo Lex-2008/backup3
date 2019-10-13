@@ -87,7 +87,7 @@ current2db ()
 old2db ()
 {
 	if test -n "$FIX"; then
-		/usr/bin/find "$BACKUP_MAIN" \( -type f -o -type l \) -printf '%P\0' | /bin/sed -z -r "
+		/usr/bin/find "$BACKUP_MAIN" \( -type f -o -type l \) -name "*$BACKUP_TIME_SEP$BACKUP_TIME_NOW" -printf '%P\0' | /bin/sed -z -r "
 		s/'/''/g;
 		1i BEGIN TRANSACTION;
 		s_^((.*)/)?(.*)/(.*)$BACKUP_TIME_SEP(.*)\$_	\\
@@ -105,7 +105,7 @@ old2db ()
 		  \$a END TRANSACTION;
 		" | tr '\0' '\n' | $SQLITE
 	else
-		/usr/bin/find "$BACKUP_MAIN" \( -type f -o -type l \) -printf '%P\0' | /bin/sed -z -r "
+		/usr/bin/find "$BACKUP_MAIN" \( -type f -o -type l \) -name "*$BACKUP_TIME_SEP$BACKUP_TIME_NOW" -printf '%P\0' | /bin/sed -z -r "
 		s/'/''/g;
 		1i BEGIN TRANSACTION;
 		s_^((.*)/)?(.*)/(.*)$BACKUP_TIME_SEP(.*)\$_	\\
