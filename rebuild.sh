@@ -21,15 +21,15 @@ flock -n 200 || exit 200
 
 ### DATABASE ###
 
-/usr/bin/find "$BACKUP_MAIN" $BACKUP_FIND_FILTER \( -type f -o -type l \) -printf '%s %P\n' | sed '
+/usr/bin/find "$BACKUP_MAIN" $BACKUP_FIND_FILTER \( -type f -o -type l \) -name "*$BACKUP_TIME_SEP*" -printf '%P\n' | sed '
 	1i .timeout 10000
 	1i BEGIN TRANSACTION;
 	1i DELETE FROM history;
 	'"s/'/''/g"'        # duplicate single quotes
 	/[/].*[/]/!s_ _ /_; # ensure all lines have two dir separators
-	s_\([0-9]*\) \(.*\)/\(.*\)/\(.*\)'"$BACKUP_TIME_SEP"'\(.*\)_	\
-		INSERT INTO history (dirname, filename, created, deleted, freq, size)	\
-		VALUES '"('\\2', '\\3', '\\4', '\\5', 0, '\\1');_
+	s_\(\(.*\)/\)\?\(.*\)/\(.*\)'"$BACKUP_TIME_SEP"'\(.*\)_	\
+		INSERT INTO history (dirname, filename, created, deleted, freq)	\
+		VALUES '"('\\2', '\\3', '\\4', '\\5', 0);_
 	\$a UPDATE history	\\
 		SET freq = CASE		\\
 			WHEN strftime('%Y-%m', created, '-1 minute') !=	\\
