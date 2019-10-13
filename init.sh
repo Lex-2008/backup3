@@ -22,6 +22,5 @@ $SQLITE "CREATE TABLE history(
 	freq INTEGER NOT NULL);
 CREATE INDEX history_update ON history(dirname, filename);
 CREATE INDEX timeline ON history(freq, deleted) WHERE freq != 0;
--- CREATE INDEX IF NOT EXISTS check_old ON history(dirname, filename, created);
 PRAGMA journal_mode=WAL;
 "
