@@ -26,7 +26,7 @@ test "$dirname" = "$filename" && dirname=''
 
 ### OLD FILE ###
 if test -f "$BACKUP_CURRENT/$fullname"; then
-	old_created_filename="$($SQLITE ".timeout 10000
+	old_created_filename="$(echo ".timeout 1000
 		SELECT dirname || '/' || filename || '/' || created
 		FROM history
 		WHERE dirname = '$dirname'
@@ -53,7 +53,8 @@ if test -f "$BACKUP_CURRENT/$fullname"; then
 		WHERE dirname = '$dirname'
 		  AND filename = '$filename'
 		  AND freq = 0;
-		  ")"
+		  " | $SQLITE)"
+	# echo "got [$old_created_filename]"
 	mv "$BACKUP_MAIN/$old_created_filename$BACKUP_TIME_SEP$BACKUP_TIME_NOW" "$BACKUP_MAIN/$old_created_filename$BACKUP_TIME_SEP$BACKUP_TIME"
 fi
 
@@ -62,9 +63,9 @@ rsync -a --fake-super "$BACKUP_FROM/$fullname" "$BACKUP_CURRENT/$fullname"
 ### NEW FILE ###
 
 inode=$(stat -c%i "$BACKUP_CURRENT/$fullname")
-$SQLITE ".timeout 10000
-	INSERT INTO history (dirname, filename, created, deleted, freq)
+echo ".timeout 10000
+	INSERT INTO history (inode, dirname, filename, created, deleted, freq)
 	VALUES ('$inode', '$dirname', '$filename', '$BACKUP_TIME', '$BACKUP_TIME_NOW', 0);
-	"
+	" | $SQLITE
 ln "$BACKUP_CURRENT/$fullname" "$BACKUP_MAIN/$fullname/$BACKUP_TIME$BACKUP_TIME_SEP$BACKUP_TIME_NOW"
 
