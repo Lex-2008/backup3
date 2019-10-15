@@ -5,7 +5,6 @@
 test -z "$BACKUP_ROOT"    && exit 2
 
 test -z "$BACKUP_CURRENT" && BACKUP_CURRENT=$BACKUP_ROOT/current
-test -z "$BACKUP_LIST"    && BACKUP_LIST=$BACKUP_ROOT/files.txt
 test -z "$BACKUP_FLOCK"   && BACKUP_FLOCK=$BACKUP_ROOT/lock
 test -z "$BACKUP_MAIN"    && BACKUP_MAIN=$BACKUP_ROOT/data
 test -z "$BACKUP_DB"      && BACKUP_DB=$BACKUP_ROOT/backup.db
@@ -63,8 +62,12 @@ done"
 
 /usr/bin/find "$BACKUP_MAIN" $BACKUP_FIND_FILTER \( -type f -o -type l \) -name "*$BACKUP_TIME_SEP$BACKUP_TIME_NOW" -printf '%P\0' | xargs -r -0 sh -c "$cmd" x
 
-### FILES.TXT ###
+### INODE NUMBERS ###
 
-# from backup.sh
-/usr/bin/find "$BACKUP_CURRENT" $BACKUP_FIND_FILTER \( -type f -o -type l \) -printf '%i %P\n' | LC_ALL=POSIX sort >"$BACKUP_LIST".new
-mv "$BACKUP_LIST".new "$BACKUP_LIST"
+sed="s/'/''/g        # duplicate single quotes
+	1i BEGIN TRANSACTION;
+	\$a END TRANSACTION;
+	s_^([0-9]*) ((.*)/)?(.*)_	\\
+	UPDATE history SET inode='\\1' WHERE dirname='\\3' AND filename='\\4';	\\
+	_"
+/usr/bin/find "$BACKUP_CURRENT" $BACKUP_FIND_FILTER \( -type f -o -type l \) -printf '%i %P\n' | sed -r "$sed" | $SQLITE

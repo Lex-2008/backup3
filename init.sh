@@ -15,11 +15,13 @@ SQLITE="sqlite3 $BACKUP_DB"
 mkdir -p $BACKUP_CURRENT $BACKUP_MAIN $BACKUP_RSYNC_LOGS
 
 $SQLITE "CREATE TABLE history(
-	dirname TEXT NOT NULL,
-	filename TEXT NOT NULL,
-	created TEXT NOT NULL,
-	deleted TEXT NOT NULL,
-	freq INTEGER NOT NULL);
+	inode INTEGER,
+	dirname TEXT,
+	filename TEXT,
+	created TEXT,
+	deleted TEXT,
+	freq INTEGER);
+CREATE INDEX inodes_compare ON history(inode) WHERE freq = 0;
 CREATE INDEX history_update ON history(dirname, filename);
 CREATE INDEX timeline ON history(freq, deleted) WHERE freq != 0;
 PRAGMA journal_mode=WAL;

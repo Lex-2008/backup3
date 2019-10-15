@@ -302,10 +302,16 @@ similar files to each other:
 
 	cd "$BACKUP_ROOT"
 	rdfind -ignoreempty false -removeidentinode false -makehardlinks true current data
-	find current \( -type f -o -type l \) -printf '%i %P\n' | LC_ALL=POSIX sort >files.txt
+	sed="s/'/''/g        # duplicate single quotes
+		1i BEGIN TRANSACTION;
+		\$a END TRANSACTION;
+		s_^([0-9]*) ((.*)/)?(.*)_	\\
+		UPDATE history SET inode='\\1' WHERE dirname='\\3' AND filename='\\4';	\\
+		_"
+	/usr/bin/find "$BACKUP_CURRENT" $BACKUP_FIND_FILTER \( -type f -o -type l \) -printf '%i %P\n' | sed -r "$sed" | $SQLITE
 
-Last command updates files.txt with inodes of new files. Note, however, that
-above command changes timestamps of some files in "current" backup dir, so
+Last two commands update database with inodes of new files. Note, however,
+that `rdfind` will change timestamps of some files in "current" backup dir, so
 rsync still will overwrite them on next run, creating new duplicates. Moreover,
 it might hardlink together files in "current" dir which have same contents but
 different permissions. As a result, _each_ following rsync run will flip their

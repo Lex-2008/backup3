@@ -5,7 +5,6 @@
 test -z "$BACKUP_ROOT"    && exit 2
 
 test -z "$BACKUP_CURRENT" && BACKUP_CURRENT=$BACKUP_ROOT/current
-test -z "$BACKUP_LIST"    && BACKUP_LIST=$BACKUP_ROOT/files.txt
 test -z "$BACKUP_FLOCK"   && BACKUP_FLOCK=$BACKUP_ROOT/lock
 test -z "$BACKUP_FIFO"    && BACKUP_FIFO=$BACKUP_ROOT/fifo
 test -z "$BACKUP_MAIN"    && BACKUP_MAIN=$BACKUP_ROOT/data
@@ -54,20 +53,24 @@ command -v run_this >/dev/null && run_this
 
 ### COMPARE ###
 
-# listing all files together with their inodes currently in backup dir
-# note that here we use "real" find, because the busybox one doesn't have "-printf"
-# Note: if changing, copypaste to rebuild.sh and README.md (in rdfind section)
-/usr/bin/find "$BACKUP_CURRENT" $BACKUP_FIND_FILTER \( -type f -o -type l \) -printf '%i %P\n' | LC_ALL=POSIX sort >"$BACKUP_LIST".new
-
-# Add empty file if it's missing so comm doesn't complain
-touch "$BACKUP_LIST"
-
+mkfifo "$BACKUP_FIFO.inodes.new"
+mkfifo "$BACKUP_FIFO.inodes.old"
 mkfifo "$BACKUP_FIFO.sql"
 mkfifo "$BACKUP_FIFO.files.new"
 mkfifo "$BACKUP_FIFO.files.old"
 
+# listing all files together with their inodes currently in backup dir
+# note that here we use "real" find, because the busybox one doesn't have "-printf"
+# Note: if changing, update rebuild.sh and README.md (in rdfind section)
+$SQLITE -separator ' ' "SELECT inode, dirname || '/' || filename
+	FROM history
+	WHERE freq = 0;
+	" | LC_ALL=C sort >"$BACKUP_FIFO.inodes.old" &
+
+/usr/bin/find "$BACKUP_CURRENT" $BACKUP_FIND_FILTER \( -type f -o -type l \) -printf '%i %P\n' | LC_ALL=C sort >"$BACKUP_FIFO.inodes.new" &
+
 # comparing this list to its previous version
-LC_ALL=POSIX comm -3 "$BACKUP_LIST" "$BACKUP_LIST".new | tr '\n' '\0' | tee "$BACKUP_FIFO.sql" "$BACKUP_FIFO.files.new" >"$BACKUP_FIFO.files.old" &
+LC_ALL=C comm -3 "$BACKUP_FIFO.inodes.old" "$BACKUP_FIFO.inodes.new" | tr '\n' '\0' | tee "$BACKUP_FIFO.sql" "$BACKUP_FIFO.files.new" >"$BACKUP_FIFO.files.old" &
 
 # Note that here we use "real" sed, because the busybox one doesn't have "-z"
 
@@ -80,12 +83,11 @@ LC_ALL=POSIX comm -3 "$BACKUP_LIST" "$BACKUP_LIST".new | tr '\n' '\0' | tee "$BA
 	1i BEGIN TRANSACTION;
 	\$a END TRANSACTION;
 	\$a PRAGMA optimize;
-	# /\"/d;     # delete lines with double-quotes in filenames
 	s/'/''/g   # duplicate single quotes
 	/^\\t/{    # lines starting with TAB means new file
-		s_^\\t[0-9]* ((.*)/)?(.*)_	\\
-			INSERT INTO history (dirname, filename, created, deleted, freq)	\\
-			VALUES ('\\2', '\\3', '$BACKUP_TIME', '$BACKUP_TIME_NOW', 0);	\\
+		s_^\\t([0-9]*) ((.*)/)?(.*)_	\\
+			INSERT INTO history (inode, dirname, filename, created, deleted, freq)	\\
+			VALUES ('\\1', '\\3', '\\4', '$BACKUP_TIME', '$BACKUP_TIME_NOW', 0);	\\
 		_;p;d}
 	s_^[0-9]* ((.*)/)?(.*)_	\\
 		UPDATE history	\\
@@ -122,7 +124,6 @@ while test \$# -ge 1; do
 done"
 
 /bin/sed -z '/^\t/!d;     # delete lines NOT starting with TAB
-	# /"/d;             # delete lines with double-quotes in filenames
 	s_^\t[0-9]* __   # delete inode number
 	' "$BACKUP_FIFO.files.new" | xargs -r -0 sh -c "$cmd" x &
 
@@ -141,7 +142,6 @@ done"
 	1i BEGIN TRANSACTION;
 	\$a END TRANSACTION;
 	/^\\t/d;    # delete lines starting with TAB
-	# /\"/d;      # delete lines with double-quotes in filenames
 	s/'/''/g;   # duplicate single quotes
 	s_^[0-9]* ((.*)/)?(.*)_	\\
 		SELECT dirname || '/' || filename || '/' || created	\\
@@ -157,7 +157,5 @@ done"
 wait
 
 # clean up
-mv "$BACKUP_LIST".new "$BACKUP_LIST"
-touch -d "$BACKUP_TIME" "$BACKUP_LIST"
 rm "$BACKUP_FIFO"*
 

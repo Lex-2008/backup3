@@ -61,9 +61,10 @@ rsync -a --fake-super "$BACKUP_FROM/$fullname" "$BACKUP_CURRENT/$fullname"
 
 ### NEW FILE ###
 
+inode=$(stat -c%i "$BACKUP_CURRENT/$fullname")
 $SQLITE ".timeout 10000
 	INSERT INTO history (dirname, filename, created, deleted, freq)
-	VALUES ('$dirname', '$filename', '$BACKUP_TIME', '$BACKUP_TIME_NOW', 0);
+	VALUES ('$inode', '$dirname', '$filename', '$BACKUP_TIME', '$BACKUP_TIME_NOW', 0);
 	"
 ln "$BACKUP_CURRENT/$fullname" "$BACKUP_MAIN/$fullname/$BACKUP_TIME$BACKUP_TIME_SEP$BACKUP_TIME_NOW"
 
