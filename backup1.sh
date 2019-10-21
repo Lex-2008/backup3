@@ -4,8 +4,9 @@
 
 test -z "$BACKUP_FROM"    && exit 2
 test -z "$BACKUP_ROOT"    && exit 2
-test -z "$1"              && exit 2
-fullname="$1"
+test -z "$2"              && exit 2
+operation="$1"            # either 'r' for new files or 'u' for deleted ones
+fullname="$2"
 
 test -z "$BACKUP_CURRENT" && BACKUP_CURRENT=$BACKUP_ROOT/current
 test -z "$BACKUP_MAIN"    && BACKUP_MAIN=$BACKUP_ROOT/data
@@ -19,13 +20,15 @@ test -z "$BACKUP_MAX_FREQ" && BACKUP_MAX_FREQ=8640
 SQLITE="sqlite3 $BACKUP_DB"
 
 filename="${fullname##*/}"
-dirname="${fullname%/*}"
+unsafedirname="${fullname%/*}"
 filename="${filename/'/''}"
-dirname="${dirname/'/''}"
+dirname="${unsafedirname/'/''}"
 test "$dirname" = "$filename" && dirname=''
 
 ### OLD FILE ###
-if test -f "$BACKUP_CURRENT/$fullname"; then
+if test "$operation" = "u"; then
+	# Get part of filename with created date (for rename op)
+	# AND add the deleted timestamp to DB entry
 	old_created_filename="$(echo ".timeout 1000
 		SELECT dirname || '/' || filename || '/' || created
 		FROM history
@@ -55,17 +58,23 @@ if test -f "$BACKUP_CURRENT/$fullname"; then
 		  AND freq = 0;
 		  " | $SQLITE)"
 	# echo "got [$old_created_filename]"
+	# echo rm "$BACKUP_CURRENT/$fullname"
+	# echo mv "$BACKUP_MAIN/$old_created_filename$BACKUP_TIME_SEP$BACKUP_TIME_NOW" "$BACKUP_MAIN/$old_created_filename$BACKUP_TIME_SEP$BACKUP_TIME"
+	rm "$BACKUP_CURRENT/$fullname"
 	mv "$BACKUP_MAIN/$old_created_filename$BACKUP_TIME_SEP$BACKUP_TIME_NOW" "$BACKUP_MAIN/$old_created_filename$BACKUP_TIME_SEP$BACKUP_TIME"
 fi
 
-rsync -a --fake-super "$BACKUP_FROM/$fullname" "$BACKUP_CURRENT/$fullname"
-
 ### NEW FILE ###
+if test "$operation" = "r"; then
+	mkdir -p "$BACKUP_CURRENT/$unsafedirname"
+	rsync -a --fake-super "$BACKUP_FROM/$fullname" "$BACKUP_CURRENT/$fullname"
 
-inode=$(stat -c%i "$BACKUP_CURRENT/$fullname")
-echo ".timeout 10000
-	INSERT INTO history (inode, dirname, filename, created, deleted, freq)
-	VALUES ('$inode', '$dirname', '$filename', '$BACKUP_TIME', '$BACKUP_TIME_NOW', 0);
-	" | $SQLITE
-ln "$BACKUP_CURRENT/$fullname" "$BACKUP_MAIN/$fullname/$BACKUP_TIME$BACKUP_TIME_SEP$BACKUP_TIME_NOW"
-
+	inode=$(stat -c%i "$BACKUP_CURRENT/$fullname")
+	echo ".timeout 10000
+		INSERT INTO history (inode, dirname, filename, created, deleted, freq)
+		VALUES ('$inode', '$dirname', '$filename', '$BACKUP_TIME', '$BACKUP_TIME_NOW', 0);
+		" | $SQLITE
+	mkdir -p "$BACKUP_MAIN/$fullname"
+	# echo ln "$BACKUP_CURRENT/$fullname" "$BACKUP_MAIN/$fullname/$BACKUP_TIME$BACKUP_TIME_SEP$BACKUP_TIME_NOW"
+	ln "$BACKUP_CURRENT/$fullname" "$BACKUP_MAIN/$fullname/$BACKUP_TIME$BACKUP_TIME_SEP$BACKUP_TIME_NOW"
+fi
