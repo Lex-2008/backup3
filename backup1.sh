@@ -1,6 +1,7 @@
 #!/bin/busybox ash
 #
-# Main backup script.
+# Script to update single file (hence the name).
+# Accepts two arguments: operation and filename.
 
 test -z "$BACKUP_FROM"    && exit 2
 test -z "$BACKUP_ROOT"    && exit 2
@@ -16,6 +17,12 @@ test -z "$BACKUP_TIME"    && BACKUP_TIME="$(date +"%F %H:%M:%S")"
 test -z "$BACKUP_TIME_SEP" && BACKUP_TIME_SEP="~" # must be regexp-safe
 test -z "$BACKUP_TIME_NOW" && BACKUP_TIME_NOW=now # must be 'now' or valid date in future
 test -z "$BACKUP_MAX_FREQ" && BACKUP_MAX_FREQ=8640
+
+# 2592000 is number of seconds / month
+# BACKUP_MAX_FREQ is number of events / month
+# hence 2592000/BACKUP_MAX_FREQ is number of seconds / event
+# usually 300 seconds for BACKUP_MAX_FREQ=8640 (5 minutes)
+BACKUP_MAX_FREQ_SEC="$(echo "2592000 $BACKUP_MAX_FREQ / p" | dc)"
 
 SQLITE="sqlite3 $BACKUP_DB"
 
@@ -39,19 +46,23 @@ if test "$operation" = "u"; then
 		UPDATE history
 		SET 	deleted = '$BACKUP_TIME',
 			freq = CASE
-				WHEN strftime('%Y-%m', created,        '-1 minute') !=
-				     strftime('%Y-%m', '$BACKUP_TIME', '-1 minute')
+				WHEN strftime('%Y-%m', created,        '-1 second') !=
+				     strftime('%Y-%m', '$BACKUP_TIME', '-1 second')
 				     THEN 1 -- different month
-				WHEN strftime('%Y %W', created,        '-1 minute') !=
-				     strftime('%Y %W', '$BACKUP_TIME', '-1 minute')
+				WHEN strftime('%Y %W', created,        '-1 second') !=
+				     strftime('%Y %W', '$BACKUP_TIME', '-1 second')
 				     THEN 5 -- different week
-				WHEN strftime('%Y-%m-%d', created,        '-1 minute') !=
-				     strftime('%Y-%m-%d', '$BACKUP_TIME', '-1 minute')
+				WHEN strftime('%Y-%m-%d', created,        '-1 second') !=
+				     strftime('%Y-%m-%d', '$BACKUP_TIME', '-1 second')
 				     THEN 30 -- different day
-				WHEN strftime('%Y-%m-%d %H', created,        '-1 minute') !=
-				     strftime('%Y-%m-%d %H', '$BACKUP_TIME', '-1 minute')
+				WHEN strftime('%Y-%m-%d %H', created,        '-1 second') !=
+				     strftime('%Y-%m-%d %H', '$BACKUP_TIME', '-1 second')
 				     THEN 720 -- different hour
-				ELSE $BACKUP_MAX_FREQ
+				WHEN strftime('%s', created, '-1 second')/$BACKUP_MAX_FREQ_SEC !=
+				     strftime('%s', '$BACKUP_TIME', '-1 second')/$BACKUP_MAX_FREQ_SEC
+				     THEN $BACKUP_MAX_FREQ -- crosses BACKUP_MAX_FREQ boundary (usually 5 minutes)
+				ELSE 2592000 / (strftime('%s', '$BACKUP_TIME') - strftime('%s', created))
+				     -- 2592000 is number of seconds per month
 			END
 		WHERE dirname = '$dirname'
 		  AND filename = '$filename'
