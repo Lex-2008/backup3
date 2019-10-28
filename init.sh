@@ -21,8 +21,7 @@ $SQLITE "CREATE TABLE history(
 	created TEXT,
 	deleted TEXT,
 	freq INTEGER);
-CREATE INDEX inodes_compare ON history(inode) WHERE freq = 0;
-CREATE INDEX history_update ON history(dirname, filename);
+CREATE UNIQUE INDEX history_update ON history(dirname, filename) WHERE freq = 0;
 CREATE INDEX timeline ON history(freq, deleted) WHERE freq != 0;
 PRAGMA journal_mode=WAL;
 "

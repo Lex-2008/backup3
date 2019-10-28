@@ -44,8 +44,10 @@ To notice changes in new and deleted files, we can just save list of all files, 
 Then new files will appear in diff marked with `>` symbol, and deleted - with `<`.~
 
 Update: `diff` sometimes gets confused when many lines get changed, and reports not-changed files as both created and deleted.
-I've moved to `comm -3` utility since then - when comparing two files, it prefixes lines unique to second file with tab character, and (due to `-3` argument) skips lines which present in both files.
-Lines unique to first file are printed not-tab-indented.
+~I've moved to `comm -3` utility since then - when comparing two files, it prefixes lines unique to second file with tab character, and (due to `-3` argument) skips lines which present in both files.~
+~Lines unique to first file are printed not-tab-indented.~
+
+Update 2: To make it possible to work with individual dirs of files in 'current' directory, I've moved to using SQLite for comparing "real" and "stored" filesystem state: output of `find` command is converted by sed to SQL statements to populate new table, which gets `LEFT JOIN`ed with table from previous run, and if we select rows containing `NULL` values in _right_ table - then we get rows which exist _only_ in _left_ table - these are _new_ or _old_ files depending on odred in which we join tables.
 
 To track also changed files, we actually need to record inode number together with filename - in case it's modified by rsync (remember that rsync changes inode number when modifying files), line if `find` output will change, and `comm -3` output will have two lines - one for "deletion" of old line, and one for "addition" of new one - exactly what we want!
 
