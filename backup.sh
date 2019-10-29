@@ -130,7 +130,7 @@ sql="	-- STEP 1: Create temporary tables
 			ELSE $BACKUP_MAX_FREQ
 		END
 	WHERE freq = 0
-	  AND deleted != '$BACKUP_TIME_NOW';
+	  AND deleted = '$BACKUP_TIME';
 	-- Now when 'freq' is changed, we can add entries abot new files
 	INSERT OR REPLACE INTO history (inode, dirname, filename, created, deleted, freq) SELECT * FROM new_files;
 	PRAGMA optimize;
