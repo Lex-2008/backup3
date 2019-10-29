@@ -112,7 +112,7 @@ sql="	-- STEP 1: Create temporary tables
 	-- the following statement only changes 'deleted' date - sets it to
 	-- current. 'freq' is updated on next step - so we could use 'UNIQUE
 	-- INDEX WHERE freq=0' now.
-	INSERT OR REPLACE INTO history SELECT * FROM old_files;
+	INSERT OR REPLACE INTO history (inode, dirname, filename, created, deleted, freq) SELECT * FROM old_files;
 	-- And now we update 'freq'.
 	UPDATE history SET freq = CASE
 			WHEN strftime('%Y-%m', created,        '-1 second') !=
@@ -132,7 +132,7 @@ sql="	-- STEP 1: Create temporary tables
 	WHERE freq = 0
 	  AND deleted != '$BACKUP_TIME_NOW';
 	-- Now when 'freq' is changed, we can add entries abot new files
-	INSERT INTO history SELECT * FROM new_files;
+	INSERT OR REPLACE INTO history (inode, dirname, filename, created, deleted, freq) SELECT * FROM new_files;
 	PRAGMA optimize;
 	-- STEP 3: Print out lists of new and deleted files.
 	-- List of new files
