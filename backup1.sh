@@ -28,9 +28,9 @@ SQLITE="sqlite3 $BACKUP_DB"
 
 filename="${fullname##*/}"
 unsafedirname="${fullname%/*}"
+test "$unsafedirname" = "$filename" && unsafedirname=''
 filename="${filename/'/''}"
 dirname="${unsafedirname/'/''}"
-test "$dirname" = "$filename" && dirname=''
 
 ### OLD FILE ###
 if test "$operation" = "u"; then
