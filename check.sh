@@ -16,6 +16,9 @@ test -z "$BACKUP_TIME_SEP" && BACKUP_TIME_SEP="~"
 test -z "$BACKUP_TIME_NOW" && BACKUP_TIME_NOW=now
 test -z "$BACKUP_MAX_FREQ" && BACKUP_MAX_FREQ=8640
 
+# see backup1.sh for explanation
+BACKUP_MAX_FREQ_SEC="$(echo "2592000 $BACKUP_MAX_FREQ / p" | dc)"
+
 SQLITE="sqlite3 $BACKUP_DB"
 
 # wait for lock to be available
@@ -262,45 +265,31 @@ db_dups_freq0 ()
 db_freq ()
 {
 	if test -n "$FIX"; then
-		$SQLITE "UPDATE history
-			SET freq = CASE
-				WHEN deleted = '$BACKUP_TIME_NOW'
-				     THEN 0 -- not deleted yet
-				WHEN strftime('%Y-%m', created, '-1 minute') !=
-				     strftime('%Y-%m', deleted, '-1 minute')
-				     THEN 1 -- different month
-				WHEN strftime('%Y %W', created, '-1 minute') !=
-				     strftime('%Y %W', deleted, '-1 minute')
-				     THEN 5 -- different week
-				WHEN strftime('%Y-%m-%d', created, '-1 minute') !=
-				     strftime('%Y-%m-%d', deleted, '-1 minute')
-				     THEN 30 -- different day
-				WHEN strftime('%Y-%m-%d %H', created, '-1 minute') !=
-				     strftime('%Y-%m-%d %H', deleted, '-1 minute')
-				     THEN 720 -- different hour
-				ELSE $BACKUP_MAX_FREQ
-			END;"
+		query="UPDATE history SET freq = CASE"
 	else
-		$SQLITE "SELECT *
-			FROM history
-			WHERE freq != CASE
-				WHEN deleted = '$BACKUP_TIME_NOW'
-				     THEN 0 -- not deleted yet
-				WHEN strftime('%Y-%m', created, '-1 minute') !=
-				     strftime('%Y-%m', deleted, '-1 minute')
-				     THEN 1 -- different month
-				WHEN strftime('%Y %W', created, '-1 minute') !=
-				     strftime('%Y %W', deleted, '-1 minute')
-				     THEN 5 -- different week
-				WHEN strftime('%Y-%m-%d', created, '-1 minute') !=
-				     strftime('%Y-%m-%d', deleted, '-1 minute')
-				     THEN 30 -- different day
-				WHEN strftime('%Y-%m-%d %H', created, '-1 minute') !=
-				     strftime('%Y-%m-%d %H', deleted, '-1 minute')
-				     THEN 720 -- different hour
-				ELSE $BACKUP_MAX_FREQ
-			END;" >check.db_freq
+		query="SELECT * FROM history WHERE freq != CASE"
 	fi
+	$SQLITE "$query
+		WHEN deleted = '$BACKUP_TIME_NOW'
+		     THEN 0 -- not deleted yet
+		WHEN strftime('%Y-%m', created, '-1 minute') !=
+		     strftime('%Y-%m', deleted, '-1 minute')
+		     THEN 1 -- different month
+		WHEN strftime('%Y %W', created, '-1 minute') !=
+		     strftime('%Y %W', deleted, '-1 minute')
+		     THEN 5 -- different week
+		WHEN strftime('%Y-%m-%d', created, '-1 minute') !=
+		     strftime('%Y-%m-%d', deleted, '-1 minute')
+		     THEN 30 -- different day
+		WHEN strftime('%Y-%m-%d %H', created, '-1 minute') !=
+		     strftime('%Y-%m-%d %H', deleted, '-1 minute')
+		     THEN 720 -- different hour
+		WHEN strftime('%s', created, '-1 second')/$BACKUP_MAX_FREQ_SEC !=
+		     strftime('%s', '$BACKUP_TIME', '-1 second')/$BACKUP_MAX_FREQ_SEC
+		     THEN $BACKUP_MAX_FREQ -- crosses BACKUP_MAX_FREQ boundary (usually 5 minutes)
+		ELSE 2592000 / (strftime('%s', '$BACKUP_TIME') - strftime('%s', created))
+		     -- 2592000 is number of seconds per month
+	END;"
 }
 
 check () {
