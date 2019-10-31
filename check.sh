@@ -206,8 +206,8 @@ db_overlaps ()
 			AND a.filename = b.filename
 			AND a.created < b.deleted
 			AND b.created < a.deleted
-		GROUP BY a.dirname, a.filename, a.created
-		ORDER BY a.dirname;" | tr '\n' '\0' | xargs -0 sh -c "$cmd" x | $SQLITE
+		GROUP BY a.dirname, a.filename, a.created;
+		" | tr '\n' '\0' | xargs -0 sh -c "$cmd" x | $SQLITE
 }
 
 db_order ()
