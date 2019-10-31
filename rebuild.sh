@@ -52,10 +52,10 @@ echo "2: fill"
 			WHEN strftime('%Y-%m-%d %H', '\\5', '-1 second') !=	\\
 			     strftime('%Y-%m-%d %H', '\\6', '-1 second')	\\
 			     THEN 720 -- different hour	\\
-			WHEN strftime('%s', created, '-1 second')/$BACKUP_MAX_FREQ_SEC !=
-			     strftime('%s', '$BACKUP_TIME', '-1 second')/$BACKUP_MAX_FREQ_SEC
+			WHEN strftime('%s', '\\5', '-1 second')/$BACKUP_MAX_FREQ_SEC !=
+			     strftime('%s', '\\6', '-1 second')/$BACKUP_MAX_FREQ_SEC
 			     THEN $BACKUP_MAX_FREQ -- crosses BACKUP_MAX_FREQ boundary (usually 5 minutes)
-			ELSE 2592000 / (strftime('%s', '$BACKUP_TIME') - strftime('%s', created))
+			ELSE 2592000 / (strftime('%s', '\\6') - strftime('%s', '\\5'))
 			     -- 2592000 is number of seconds per month
 		END	\\
 		)_
