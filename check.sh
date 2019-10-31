@@ -25,6 +25,12 @@ flock 200 || exit 200
 if test "$1" = '--fix'; then
 	FIX=1
 	export FIX
+	shift
+fi
+
+if test -n "$1"; then
+	ONLY="$1"
+	export ONLY
 fi
 
 
@@ -298,6 +304,7 @@ db_freq ()
 }
 
 check () {
+	test -n "$ONLY" -a "$ONLY" != "$1" && return
 	echo ===== $1 =====
 	$1
 	test -s check.$1 || return
