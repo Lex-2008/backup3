@@ -12,6 +12,9 @@ test -z "$BACKUP_TIME_SEP" && BACKUP_TIME_SEP="~" # must NOT be /
 test -z "$BACKUP_TIME_NOW" && BACKUP_TIME_NOW=now
 test -z "$BACKUP_MAX_FREQ" && BACKUP_MAX_FREQ=8640
 
+# see backup1.sh for explanation
+BACKUP_MAX_FREQ_SEC="$(echo "2592000 $BACKUP_MAX_FREQ / p" | dc)"
+
 SQLITE="sqlite3 $BACKUP_DB"
 
 # exit if there is another copy of this script running
@@ -21,14 +24,19 @@ flock -n 200 || exit 200
 
 echo "### DATABASE ###"
 
-/usr/bin/find "$BACKUP_MAIN" $BACKUP_FIND_FILTER \( -type f -o -type l \) -name "*$BACKUP_TIME_SEP*" -printf '%i %P\n' | sed -r "
+rm "$BACKUP_DB"
+
+echo "1: create"
+./init.sh noindex
+
+echo "2: fill"
+/usr/bin/find "$BACKUP_MAIN" $BACKUP_FIND_FILTER \( -type f -o -type l \) -name "*$BACKUP_TIME_SEP*" -printf '%i %P\0' xargs -x 900000 sed -r "
 	1i .timeout 10000
 	1i BEGIN TRANSACTION;
-	1i DELETE FROM history;
+	1i INSERT INTO history (inode, dirname, filename, created, deleted, freq) VALUES
 	s/'/''/g        # duplicate single quotes
-	s_^([0-9]*) ((.*)/)?(.*)/(.*)$BACKUP_TIME_SEP(.*)_	\\
-		INSERT INTO history (inode, dirname, filename, created, deleted, freq)	\\
-		VALUES ('\\1', '\\3', '\\4', '\\5', '\\6', \\
+	s_^([0-9]*) ((.*)/)?([^/]*)/([^~]*)$BACKUP_TIME_SEP(.*)_	\\
+		('\\1', '\\3', '\\4', '\\5', '\\6', \\
 		CASE	\\
 			WHEN '\\6' = '$BACKUP_TIME_NOW'	\\
 			     THEN 0 -- still exists	\\
@@ -44,10 +52,19 @@ echo "### DATABASE ###"
 			WHEN strftime('%Y-%m-%d %H', '\\5', '-1 second') !=	\\
 			     strftime('%Y-%m-%d %H', '\\6', '-1 second')	\\
 			     THEN 720 -- different hour	\\
-			ELSE $BACKUP_MAX_FREQ		\\
+			WHEN strftime('%s', created, '-1 second')/$BACKUP_MAX_FREQ_SEC !=
+			     strftime('%s', '$BACKUP_TIME', '-1 second')/$BACKUP_MAX_FREQ_SEC
+			     THEN $BACKUP_MAX_FREQ -- crosses BACKUP_MAX_FREQ boundary (usually 5 minutes)
+			ELSE 2592000 / (strftime('%s', '$BACKUP_TIME') - strftime('%s', created))
+			     -- 2592000 is number of seconds per month
 		END	\\
-		);_
+		)_
+	\$!a ,
+	\$a ;
 	\$a END TRANSACTION;" | $SQLITE
+
+echo "3: index"
+./init.sh notable
 
 echo "### CURRENT ###"
 
