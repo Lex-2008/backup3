@@ -85,7 +85,8 @@ compare()
 	# can just use `INSERT OR REPLACE` statement, which will replace
 	# matching rows with new ones updated data. Note that can't use this
 	# trick to update freq column itself - so we'll do it in a separate step
-	sql="	PRAGMA case_sensitive_like = ON;
+	sql=".timeout 10000
+		PRAGMA case_sensitive_like = ON;
 		-- STEP 1: Create temporary tables
 		-- Lines from current fs which don't have corresponding entry in
 		-- 'history' table - in form ready to be inserted into 'history'
@@ -94,12 +95,11 @@ compare()
 		-- not affect the result in case of inode reuse
 		CREATE TEMPORARY TABLE new_files AS
 			SELECT fs.inode, fs.dirname, fs.filename, '$BACKUP_TIME', '$BACKUP_TIME_NOW', 0
-			FROM fs LEFT JOIN history
+			FROM fs LEFT JOIN history INDEXED BY history_update
 			ON  fs.inode = history.inode
 			AND fs.dirname = history.dirname
 			AND fs.filename = history.filename
 			AND history.freq = 0 -- to make history INDEXED BY history_update
-			$sql_dir
 			WHERE history.inode IS NULL;
 		-- Lines from history which don't have corresponding entry in
 		-- 'fs' table with all values unchanged except deleted date.
@@ -111,7 +111,7 @@ compare()
 		-- files deleted long time ago.
 		CREATE TEMPORARY TABLE old_files AS
 			SELECT history.inode, history.dirname, history.filename, history.created, '$BACKUP_TIME', 0
-			FROM history LEFT JOIN fs
+			FROM history INDEXED BY history_update LEFT JOIN fs
 			USING (inode, dirname, filename)
 			WHERE fs.inode IS NULL
 			   AND history.freq = 0 -- to make history INDEXED BY history_update
