@@ -27,7 +27,7 @@ echo "### DATABASE ###"
 rm "$BACKUP_DB"
 
 echo "1: create"
-./init.sh noindex
+./init.sh --noindex
 
 echo "2: fill"
 /usr/bin/find "$BACKUP_MAIN" $BACKUP_FIND_FILTER \( -type f -o -type l \) -name "*$BACKUP_TIME_SEP*" -printf '%i ./%P\n' | sed -r "
@@ -62,8 +62,11 @@ $SQLITE "UPDATE history SET freq = CASE
 		ELSE 2592000 / (strftime('%s', deleted) - strftime('%s', created))
 		     -- 2592000 is number of seconds per month
 	END;"
-echo "3: index"
-./init.sh notable
+
+echo "4: index"
+./init.sh --notable
+
+test "$1" = "--nocurrent" && exit 0
 
 echo "### CURRENT ###"
 
