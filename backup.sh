@@ -148,6 +148,7 @@ compare()
 		INSERT OR REPLACE INTO history (inode, dirname, filename, created, deleted, freq) SELECT * FROM new_files;
 		PRAGMA optimize;
 		-- STEP 3: Print out lists of new and deleted files.
+		select 'first line';
 		-- List of new files
 		select dirname || filename from new_files;
 		select 'separator';
@@ -178,7 +179,7 @@ compare()
 	mkfifo "$BACKUP_FIFO.old"
 
 	# Pipelines for new and old files
-	sed '/^separator$/,$d' "$BACKUP_FIFO.new" | tr '\n' '\0' | xargs -r -0 sh -c "$cmd_new" x &
+	sed '1d;/^separator$/,$d' "$BACKUP_FIFO.new" | tr '\n' '\0' | xargs -r -0 sh -c "$cmd_new" x &
 	sed '1,/^separator$/d' "$BACKUP_FIFO.old" | tr '\n' '\0' | xargs -r -0 sh -c "$cmd_old" x &
 
 	# Common pipeline
