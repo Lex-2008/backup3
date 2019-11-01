@@ -67,9 +67,9 @@ compare()
 	sed="s/'/''/g        # duplicate single quotes
 		1i BEGIN TRANSACTION;
 		1i CREATE TEMPORARY TABLE fs (inode INTEGER, dirname TEXT, filename TEXT, freq INTEGER);
-		s_^([0-9]*) ((.*)/)?(.*)_	\\
-			INSERT INTO fs (inode, dirname, filename, freq)	\\
-			VALUES ('\\1', '\\3', '\\4', 0);_
+		s_^([0-9]*) (.*/)([^/]*)_	\\
+			INSERT INTO fs (inode, dirname, filename)	\\
+			VALUES ('\\1', '\\2', '\\3');_
 		\$a END TRANSACTION;"
 
 	# SQL expression to run after above import is complete
