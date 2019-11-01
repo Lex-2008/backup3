@@ -19,8 +19,9 @@ SQLITE="sqlite3 $BACKUP_DB"
 
 rm -rf "$SHOW_IN"
 
+# TODO: Check performance, we don't have an index for this
 sql="PRAGMA case_sensitive_like = ON;
-	SELECT	dirname || '/' || filename,
+	SELECT	dirname || filename,
 		created || '$BACKUP_TIME_SEP' || deleted
 	FROM history
 	WHERE dirname LIKE '$SHOW_DIR%'

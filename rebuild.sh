@@ -30,39 +30,38 @@ echo "1: create"
 ./init.sh noindex
 
 echo "2: fill"
-/usr/bin/find "$BACKUP_MAIN" $BACKUP_FIND_FILTER \( -type f -o -type l \) -name "*$BACKUP_TIME_SEP*" -printf '%i %P\0' xargs -x 900000 sed -r "
+/usr/bin/find "$BACKUP_MAIN" $BACKUP_FIND_FILTER \( -type f -o -type l \) -name "*$BACKUP_TIME_SEP*" -printf '%i ./%P\n' | sed -r "
 	1i .timeout 10000
 	1i BEGIN TRANSACTION;
-	1i INSERT INTO history (inode, dirname, filename, created, deleted, freq) VALUES
 	s/'/''/g        # duplicate single quotes
-	s_^([0-9]*) ((.*)/)?([^/]*)/([^~]*)$BACKUP_TIME_SEP(.*)_	\\
-		('\\1', '\\3', '\\4', '\\5', '\\6', \\
-		CASE	\\
-			WHEN '\\6' = '$BACKUP_TIME_NOW'	\\
-			     THEN 0 -- still exists	\\
-			WHEN strftime('%Y-%m', '\\5', '-1 second') !=	\\
-			     strftime('%Y-%m', '\\6', '-1 second')	\\
-			     THEN 1 -- different month	\\
-			WHEN strftime('%Y %W', '\\5', '-1 second') !=	\\
-			     strftime('%Y %W', '\\6', '-1 second')	\\
-			     THEN 5 -- different week	\\
-			WHEN strftime('%Y-%m-%d', '\\5', '-1 second') !=	\\
-			     strftime('%Y-%m-%d', '\\6', '-1 second')		\\
-			     THEN 30 -- different day	\\
-			WHEN strftime('%Y-%m-%d %H', '\\5', '-1 second') !=	\\
-			     strftime('%Y-%m-%d %H', '\\6', '-1 second')	\\
-			     THEN 720 -- different hour	\\
-			WHEN strftime('%s', '\\5', '-1 second')/$BACKUP_MAX_FREQ_SEC !=
-			     strftime('%s', '\\6', '-1 second')/$BACKUP_MAX_FREQ_SEC
-			     THEN $BACKUP_MAX_FREQ -- crosses BACKUP_MAX_FREQ boundary (usually 5 minutes)
-			ELSE 2592000 / (strftime('%s', '\\6') - strftime('%s', '\\5'))
-			     -- 2592000 is number of seconds per month
-		END	\\
-		)_
-	\$!a ,
-	\$a ;
+	s_^([0-9]*) (.*/)([^/]*)/([^/$BACKUP_TIME_SEP]*)$BACKUP_TIME_SEP([^/$BACKUP_TIME_SEP]*)_	\\
+		INSERT INTO history (inode, dirname, filename, created, deleted, freq) VALUES	\\
+		('\\1', '\\2', '\\3', '\\4', '\\5', 0);_
 	\$a END TRANSACTION;" | $SQLITE
 
+echo "3: update freq"
+
+$SQLITE "UPDATE history SET freq = CASE
+		WHEN deleted = '$BACKUP_TIME_NOW'
+		     THEN 0 -- not deleted yet
+		WHEN strftime('%Y-%m', created, '-1 second') !=
+		     strftime('%Y-%m', deleted, '-1 second')
+		     THEN 1 -- different month
+		WHEN strftime('%Y %W', created, '-1 second') !=
+		     strftime('%Y %W', deleted, '-1 second')
+		     THEN 5 -- different week
+		WHEN strftime('%Y-%m-%d', created, '-1 second') !=
+		     strftime('%Y-%m-%d', deleted, '-1 second')
+		     THEN 30 -- different day
+		WHEN strftime('%Y-%m-%d %H', created, '-1 second') !=
+		     strftime('%Y-%m-%d %H', deleted, '-1 second')
+		     THEN 720 -- different hour
+		WHEN strftime('%s', created, '-1 second')/$BACKUP_MAX_FREQ_SEC !=
+		     strftime('%s', deleted, '-1 second')/$BACKUP_MAX_FREQ_SEC
+		     THEN $BACKUP_MAX_FREQ -- crosses BACKUP_MAX_FREQ boundary (usually 5 minutes)
+		ELSE 2592000 / (strftime('%s', deleted) - strftime('%s', created))
+		     -- 2592000 is number of seconds per month
+	END;"
 echo "3: index"
 ./init.sh notable
 

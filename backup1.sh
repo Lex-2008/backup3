@@ -7,7 +7,7 @@ test -z "$BACKUP_FROM"    && exit 2
 test -z "$BACKUP_ROOT"    && exit 2
 test -z "$2"              && exit 2
 operation="$1"            # either 'r' for new files or 'u' for deleted ones
-fullname="$2"
+fullname="./$2"
 
 test -z "$BACKUP_CURRENT" && BACKUP_CURRENT=$BACKUP_ROOT/current
 test -z "$BACKUP_MAIN"    && BACKUP_MAIN=$BACKUP_ROOT/data
@@ -27,8 +27,7 @@ BACKUP_MAX_FREQ_SEC="$(echo "2592000 $BACKUP_MAX_FREQ / p" | dc)"
 SQLITE="sqlite3 $BACKUP_DB"
 
 filename="${fullname##*/}"
-unsafedirname="${fullname%/*}"
-test "$unsafedirname" = "$filename" && unsafedirname=''
+unsafedirname="${fullname%/*}/"
 filename="${filename/'/''}"
 dirname="${unsafedirname/'/''}"
 

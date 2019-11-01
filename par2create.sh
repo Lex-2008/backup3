@@ -36,7 +36,7 @@ if test ! -z "$2"; then
 	cond2="AND created<strftime('%Y-%m', 'now', '-$2 months')"
 fi
 
-sql=" SELECT dirname || '/' || filename || '/' || created || '$BACKUP_TIME_SEP' || deleted
+sql=" SELECT dirname || filename || '/' || created || '$BACKUP_TIME_SEP' || deleted
 	FROM history
 	WHERE freq<2 $cond1 $cond2
 	ORDER BY dirname;"
@@ -59,7 +59,7 @@ cmd="getfn() {
 		# while this script is running
 		return
 	fi
-	filepart=\"\${filename%*$BACKUP_TIME_SEP*}\"
+	filepart=\"\${filename%$BACKUP_TIME_SEP*}\"
 	filename=\"\$(ls -1 \"\$filepart\"* )\"
 	if test -f \"\$filename\"; then
 		# single existing file matches filepart*
@@ -102,6 +102,8 @@ cmd="getfn() {
 			continue
 		fi
 		if test ! -f \"\$filename\"; then
+			# Maybe file was renamed while this script was running.
+			# Trying to get new filename
 			filename=\"\$(getfn \"\$filename\")\"
 			if test -z \"\$filename\"; then
 				echo

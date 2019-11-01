@@ -32,7 +32,7 @@ if test ! -z "$2"; then
 	cond2="AND created<strftime('%Y-%m', 'now', '-$2 months')"
 fi
 
-sql=" SELECT dirname || '/' || filename || '/' || created,
+sql=" SELECT dirname || filename || '/' || created,
 	'$BACKUP_TIME_SEP' || deleted
 	FROM history
 	WHERE freq<2 $cond1 $cond2

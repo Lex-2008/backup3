@@ -44,19 +44,22 @@ check_space()
 check_space || exit 0 # no cleanup needed
 
 if test "$CLEAN_BY_FREQ" = "1"; then
-	clean_multiplier="freq" # column name
+	# Uses 'timeline' index to get rows with freq!=0, then builds a temporary index for age.
+	# We can't have this index permanently, since it depends on _current_ time
+	sql="SELECT dirname || filename || '/' || created,
+			freq*(strftime('%s', 'now')-strftime('%s', deleted)) AS age,
+			rowid
+		FROM history
+		WHERE freq != 0
+		ORDER BY age DESC;"
 else
-	clean_multiplier=1 # constant number
+	# Uses 'timeline' index both for WHERE and for ORDER BY
+	sql="SELECT dirname || filename || '/' || created,
+			rowid
+		FROM history
+		WHERE freq != 0
+		ORDER BY deleted ASC;"
 fi
-
-# Uses 'timeline' index to get rows with freq!=0, then builds a temporary index for age.
-# We can't have this index permanently, since it depends on _current_ time
-sql="SELECT dirname || '/' || filename || '/' || created,
-		$clean_multiplier*(strftime('%s', 'now')-strftime('%s', deleted)) AS age,
-		rowid
-	FROM history
-	WHERE freq != 0
-	ORDER BY age DESC;"
 
 cmd="	echo '.timeout 10000'
 	echo 'BEGIN TRANSACTION;'

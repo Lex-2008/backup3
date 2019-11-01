@@ -52,7 +52,7 @@ db2current ()
 		done
 		echo 'END TRANSACTION;'
 		"
-	$SQLITE "SELECT dirname || '/' || filename,
+	$SQLITE "SELECT dirname || filename,
 			rowid
 		FROM history
 		WHERE freq = 0
@@ -74,7 +74,7 @@ db2old ()
 		done
 		echo 'END TRANSACTION;'
 		"
-	$SQLITE "SELECT dirname || '/' || filename || '/' || created || '$BACKUP_TIME_SEP' || deleted,
+	$SQLITE "SELECT dirname || filename || '/' || created || '$BACKUP_TIME_SEP' || deleted,
 			rowid
 		FROM history
 		ORDER BY dirname;" | tr '\n' '\0' | xargs -0 sh -c "$cmd" x | $SQLITE
@@ -82,26 +82,19 @@ db2old ()
 
 current2db ()
 {
-	/usr/bin/find "$BACKUP_CURRENT" \( -type f -o -type l \) -printf '%P\n' | sed '/"/d;s_^\(\(.*\)/\)\?\(.*\)$_SELECT CASE WHEN EXISTS(SELECT 1 FROM history WHERE dirname="\2" AND filename="\3" AND freq=0 LIMIT 1) THEN 1 ELSE "\2/\3" END;_' | $SQLITE | fgrep -v -x 1 | (
-		if test -n "$FIX"; then
-			cd "$BACKUP_CURRENT"
-			tee "$BACKUP_ROOT/check.current2db" | fgrep -vz -f- "$BACKUP_LIST" >"$BACKUP_LIST.new"
-			mv "$BACKUP_LIST.new" "$BACKUP_LIST"
-		else
-			cat >"$BACKUP_ROOT/check.current2db"
-		fi
-	)
+	test -n "$FIX" && echo "current2db: --fix is not supported"
+	/usr/bin/find "$BACKUP_CURRENT" \( -type f -o -type l \) -printf '%i ./%P\n' | sed -r "s/'/''/g;s_^([0-9]*) (.*/)([^/]*)_SELECT CASE WHEN EXISTS(SELECT 1 FROM history WHERE inode='\\1' AND dirname='\\2' AND filename='\\3' AND freq=0 LIMIT 1) THEN 1 ELSE '\\2\\3' END;_" | $SQLITE | fgrep -v -x 1 >"$BACKUP_ROOT/check.current2db"
 }
 
 old2db ()
 {
 	if test -n "$FIX"; then
-		/usr/bin/find "$BACKUP_MAIN" \( -type f -o -type l \) -name "*$BACKUP_TIME_SEP$BACKUP_TIME_NOW" -printf '%P\0' | /bin/sed -z -r "
+		/usr/bin/find "$BACKUP_MAIN" \( -type f -o -type l \) -name "*$BACKUP_TIME_SEP$BACKUP_TIME_NOW" -printf '%i ./%P\n' | sed -r "
 		s/'/''/g;
 		1i BEGIN TRANSACTION;
-		s_^((.*)/)?(.*)/(.*)$BACKUP_TIME_SEP(.*)\$_	\\
-			INSERT INTO history(dirname, filename, created, deleted, freq)	\\
-			SELECT '\\2', '\\3', '\\4', '\\5', 0	\\
+		s_^([0-9]*) (.*/)([^/]*)/([^/$BACKUP_TIME_SEP]*)$BACKUP_TIME_SEP([^/$BACKUP_TIME_SEP]*)\$_	\\
+			INSERT INTO history(inode, dirname, filename, created, deleted, freq)	\\
+			SELECT '\\1', '\\2', '\\3', '\\4', '\\5', 0	\\
 			WHERE NOT EXISTS (	\\
 				SELECT 1	\\
 				FROM history	\\
@@ -109,15 +102,15 @@ old2db ()
 				  AND filename='\\3'	\\
 				  AND created='\\4'	\\
 				  AND deleted='\\5'	\\
+				  AND inode='\\1'	\\
 				LIMIT 1);	\\
 			_
 		  \$a END TRANSACTION;
-		" | tr '\0' '\n' | $SQLITE
+		" | $SQLITE
 	else
-		/usr/bin/find "$BACKUP_MAIN" \( -type f -o -type l \) -name "*$BACKUP_TIME_SEP$BACKUP_TIME_NOW" -printf '%P\0' | /bin/sed -z -r "
+		/usr/bin/find "$BACKUP_MAIN" \( -type f -o -type l \) -name "*$BACKUP_TIME_SEP$BACKUP_TIME_NOW" -printf '%i ./%P\n' | sed -r "
 		s/'/''/g;
-		1i BEGIN TRANSACTION;
-		s_^((.*)/)?(.*)/(.*)$BACKUP_TIME_SEP(.*)\$_	\\
+		s_^([0-9]*) (.*/)([^/]*)/([^/$BACKUP_TIME_SEP]*)$BACKUP_TIME_SEP([^/$BACKUP_TIME_SEP]*)\$_	\\
 		SELECT CASE WHEN EXISTS	\\
 		  (SELECT 1	\\
 		   FROM history	\\
@@ -125,27 +118,27 @@ old2db ()
 		     AND filename='\\3'	\\
 		     AND created='\\4'	\\
 		     AND deleted='\\5'	\\
+		     AND inode='\\1'	\\
 		   LIMIT 1) THEN 1	\\
-                  ELSE '\\1\\3/\\4$BACKUP_TIME_SEP\\5'	\\
+                  ELSE '\\2\\3/\\4$BACKUP_TIME_SEP\\5'	\\
 		  END;_
-		  \$a END TRANSACTION;
-		  " | tr '\0' '\n' | $SQLITE | fgrep -v -x 1 >"$BACKUP_ROOT/check.old2db"
+		  " | $SQLITE | fgrep -v -x 1 >"$BACKUP_ROOT/check.old2db"
 	fi
 }
 
 old2current ()
 {
-	cmd="	len=
-		while test \$# -ge 1; do
-			# remove $BACKUP_MAIN prefix from filename
-			filename=\"\${1:${#BACKUP_MAIN}}\"
+	cmd="	while test \$# -ge 1; do
+			# $1 points to the file in data dir - i.e. it's like this:
+			# dirname/filename/created~now
+			filename=\"\${1%/*}\"
 			if ! test -f \"$BACKUP_CURRENT/\$filename\"; then
-				echo \"$filename\"
+				echo \"ln \$1 => $BACKUP_CURRENT/\$filename\"
 				test -n \"$FIX\" && ln \"\$1\" \"$BACKUP_CURRENT/\$filename\"
 			fi
 			shift
 		done"
-	/usr/bin/find "$BACKUP_MAIN" \( -type f -o -type l \) -name "*$BACKUP_TIME_SEP$BACKUP_TIME_NOW" -printf '%h\0' | xargs -0 sh -c "$cmd" x
+	/usr/bin/find "$BACKUP_MAIN" \( -type f -o -type l \) -name "*$BACKUP_TIME_SEP$BACKUP_TIME_NOW" -printf '%P\0' | xargs -0 sh -c "$cmd" x >"$BACKUP_ROOT/check.old2current"
 }
 
 current2old ()
@@ -197,8 +190,8 @@ db_overlaps ()
 		echo 'END TRANSACTION;'
 		"
 	$SQLITE "SELECT
-			a.dirname || '/' || a.filename || '/' || a.created || '$BACKUP_TIME_SEP' || a.deleted,
-			a.dirname || '/' || a.filename || '/' || a.created || '$BACKUP_TIME_SEP' || b.created,
+			a.dirname || a.filename || '/' || a.created || '$BACKUP_TIME_SEP' || a.deleted,
+			a.dirname || a.filename || '/' || a.created || '$BACKUP_TIME_SEP' || b.created,
 			'UPDATE history SET deleted = \"' || b.created || '\" WHERE rowid = \"' || a.rowid || '\";'
 		FROM history AS a, history AS b
 		WHERE a.created < b.created

@@ -58,7 +58,7 @@ compare()
 	dir="$1" # if arg is passed, we're processing only one dir
 	if test -n "$dir"; then
 		ddir="$dir/"
-		sql_dir="AND ( history.dirname = '$dir' OR history.dirname LIKE '$dir/%' )"
+		sql_dir="AND history.dirname LIKE './$ddir%'"
 	fi
 
 	# sed expression to convert `find` output into SQL query which imports
@@ -149,11 +149,11 @@ compare()
 		PRAGMA optimize;
 		-- STEP 3: Print out lists of new and deleted files.
 		-- List of new files
-		select './' || dirname || '/' || filename from new_files;
+		select dirname || filename from new_files;
 		select 'separator';
 		-- List of old files
 		-- Note that we print with partial filename in data dir
-		SELECT './' || dirname || '/' || filename || '/' || created FROM old_files;
+		SELECT dirname || filename || '/' || created FROM old_files;
 		"
 
 	# Shell command to operate on new files:
@@ -182,7 +182,7 @@ compare()
 	sed '1,/^separator$/d' "$BACKUP_FIFO.old" | tr '\n' '\0' | xargs -r -0 sh -c "$cmd_old" x &
 
 	# Common pipeline
-	/usr/bin/find "$BACKUP_CURRENT/$dir" $BACKUP_FIND_FILTER \( -type f -o -type l \) -printf "%i $ddir%P\\n" | ( sed -r "$sed"; echo "$sql" ) | $SQLITE | tee "$BACKUP_FIFO.new" >"$BACKUP_FIFO.old"
+	/usr/bin/find "$BACKUP_CURRENT/$dir" $BACKUP_FIND_FILTER \( -type f -o -type l \) -printf "%i ./$ddir%P\\n" | ( sed -r "$sed"; echo "$sql" ) | $SQLITE | tee "$BACKUP_FIFO.new" >"$BACKUP_FIFO.old"
 
 	rm "$BACKUP_FIFO"*
 }
