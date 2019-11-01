@@ -50,47 +50,58 @@ cmd="	while test \$# -ge 1; do
 		fileend=\"\${1##*|}\"
 		filename=\"\$filepart\$fileend\"
 		if test -f \"\$filepart.bak\"; then
+			# *.bak file found, check it
 			if diff -q \"\$filepart.bak\" \"\$filename\"; then
 				echo -n c
 			else
 				echo
 				echo FILES DIFFER: \"\$filepart.bak\" \"\$filename\"
 			fi
-		elif test -f \"\$filepart.par2\"; then
-			par2verify -q \"\$filepart.par2\" >\"$BACKUP_PAR2_LOG\" &
-			par_pid=\$!
-			$cpulimit_cmd
-			if wait \$par_pid; then
-				echo -n p
-				shift
-				continue
-			fi
-			target_filename=\"\$(sed -r '/^Target:/!d;s/^Target: \"(.*)\" - missing.$/\\1/' \"$BACKUP_PAR2_LOG\")\"
-			if test -z \"\$target_filename\"; then
-				echo
-				echo PAR2 FAILED: \"\$filepart.par2\" - no target_filename
-				cat \"$BACKUP_PAR2_LOG\"
-				shift
-				continue
-			fi
-			dirname=\"\${filename%/*}\"
-			target_filename=\"\$dirname/\$target_filename\"
-			mv \"\$filename\" \"\$target_filename\"
-			par2verify -qq \"\$filepart.par2\" \"\$filename\" &
-			par_pid=\$!
-			$cpulimit_cmd
-			if wait \$par_pid; then
-				echo -n P
-			else
-				echo
-				echo PAR2 FAILED: \"\$filepart.par2\"
-				# rm -f \"\$filepart.par2\" \"\$filepart.vol\"*
-			fi
-			mv \"\$target_filename\" \"\$filename\"
-		else
+			shift
+			continue
+		elif ! test -f \"\$filepart.par2\"; then
+			# neither *.bak, nor *.par2 file found
 			echo
 			echo NOT PROTECTED: \"\$filename\"
+			shift
+			continue
 		fi
+		# check *.par2 file
+		par2verify -q \"\$filepart.par2\" >\"$BACKUP_PAR2_LOG\" &
+		par_pid=\$!
+		$cpulimit_cmd
+		if wait \$par_pid; then
+			echo -n p
+			shift
+			continue
+		fi
+		# check if file was renamed
+		target_filename=\"\$(sed -r '/^Target:/!d;s/^Target: \"(.*)\" - missing.$/\\1/' \"$BACKUP_PAR2_LOG\")\"
+		if test -z \"\$target_filename\"; then
+			echo
+			echo PAR2 FAILED: \"\$filepart.par2\" - no target_filename
+			cat \"$BACKUP_PAR2_LOG\"
+			shift
+			continue
+		fi
+		# rename file and repeat par2verify run
+		dirname=\"\${filename%/*}\"
+		target_filename=\"\$dirname/\$target_filename\"
+		mv \"\$filename\" \"\$target_filename\"
+		par2verify -qq \"\$filepart.par2\" \"\$filename\" &
+		par_pid=\$!
+		$cpulimit_cmd
+		if wait \$par_pid; then
+			echo -n R
+			# note that we can't shift and continue here, because
+			# we should rename file back to original
+		else
+			echo
+			echo PAR2 FAILED: \"\$filepart.par2\"
+			# rm -f \"\$filepart.par2\" \"\$filepart.vol\"*
+		fi
+		# rename file back to original
+		mv \"\$target_filename\" \"\$filename\"
 		shift
 	done
 	"
