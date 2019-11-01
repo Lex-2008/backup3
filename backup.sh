@@ -185,6 +185,9 @@ compare()
 	# Common pipeline
 	/usr/bin/find "$BACKUP_CURRENT/$dir" $BACKUP_FIND_FILTER \( -type f -o -type l \) -printf "%i ./$ddir%P\\n" | ( sed -r "$sed"; echo "$sql" ) | $SQLITE | tee "$BACKUP_FIFO.new" >"$BACKUP_FIFO.old"
 
+	# wait for background jobs to finish
+	wait
+
 	rm "$BACKUP_FIFO"*
 }
 
