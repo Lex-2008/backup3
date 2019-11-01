@@ -2,6 +2,8 @@
 #
 # Script to update single file (hence the name).
 # Accepts two arguments: operation and filename.
+#
+# Note on shebang: it must be a shell that understands "${filename/'/''}" synthax
 
 test -z "$BACKUP_FROM"    && exit 2
 test -z "$BACKUP_ROOT"    && exit 2
