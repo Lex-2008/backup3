@@ -21,6 +21,7 @@ test -z "$BACKUP_FLOCK"   && BACKUP_FLOCK=$BACKUP_ROOT/lock
 test -z "$BACKUP_TIME_SEP" && BACKUP_TIME_SEP="~" # must be regexp-safe
 test -z "$BACKUP_TIME_NOW" && BACKUP_TIME_NOW=now # must be 'now' or valid date in future
 test -z "$BACKUP_PAR2_CPULIMIT" && BACKUP_PAR2_CPULIMIT=0 # limit CPU usage by par2 process
+test -z "$BACKUP_PAR2_LOG" && BACKUP_PAR2_LOG=$BACKUP_ROOT/par2.log
 
 SQLITE="sqlite3 $BACKUP_DB"
 
@@ -56,16 +57,36 @@ cmd="	while test \$# -ge 1; do
 				echo FILES DIFFER: \"\$filepart.bak\" \"\$filename\"
 			fi
 		elif test -f \"\$filepart.par2\"; then
-			par2verify -qq \"\$filepart.par2\" &
+			par2verify -q \"\$filepart.par2\" >\"$BACKUP_PAR2_LOG\" &
 			par_pid=\$!
 			$cpulimit_cmd
 			if wait \$par_pid; then
 				echo -n p
+				shift
+				continue
+			fi
+			target_filename=\"\$(sed -r '/^Target:/!d;s/^Target: \"(.*)\" - missing.$/\\1/' \"$BACKUP_PAR2_LOG\")\"
+			if test -z \"\$target_filename\"; then
+				echo
+				echo PAR2 FAILED: \"\$filepart.par2\" - no target_filename
+				cat \"$BACKUP_PAR2_LOG\"
+				shift
+				continue
+			fi
+			dirname=\"\${filename%/*}\"
+			target_filename=\"\$dirname/\$target_filename\"
+			mv \"\$filename\" \"\$target_filename\"
+			par2verify -qq \"\$filepart.par2\" \"\$filename\" &
+			par_pid=\$!
+			$cpulimit_cmd
+			if wait \$par_pid; then
+				echo -n P
 			else
 				echo
-				echo PAR2 FAILED: \"\$filepart.par2\" \"\$filename\"
+				echo PAR2 FAILED: \"\$filepart.par2\"
 				# rm -f \"\$filepart.par2\" \"\$filepart.vol\"*
 			fi
+			mv \"\$target_filename\" \"\$filename\"
 		else
 			echo
 			echo NOT PROTECTED: \"\$filename\"
