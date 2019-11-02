@@ -205,15 +205,15 @@ db_overlaps ()
 
 db_order ()
 {
-	if test -n "$FIX"; then
-		$SQLITE "DELETE
-			FROM history
-			WHERE created >= deleted;"
-	else
-		$SQLITE "SELECT *
-			FROM history
-			WHERE created >= deleted;" >check.db_order
-	fi
+	cmd="	while test \$# -ge 1; do
+			echo rm \"$BACKUP_MAIN/\$1\"
+			test -n \"$FIX\" && rm \"$BACKUP_MAIN/\$1\"
+			shift
+		done
+		"
+	$SQLITE "SELECT dirname || filename || '/' || created || '$BACKUP_TIME_SEP' || deleted
+		FROM history
+		WHERE created >= deleted;" | tr '\n' '\0' | xargs -0 sh -c "$cmd" x >check.db_order
 }
 
 db_dups_created ()
@@ -304,8 +304,10 @@ $SQLITE "CREATE INDEX IF NOT EXISTS check_tmp ON history(dirname, filename, crea
 # Tests that might add new files in current
 check old2current
 
-# Tests that might delete some DB rows
+# Tests that might delete some files in db
 check db_order
+
+# Tests that might delete some DB rows
 check db2current
 check db2old
 check db_dups_created
