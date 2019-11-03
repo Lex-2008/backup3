@@ -44,7 +44,7 @@ sql=" SELECT dirname || filename || '/' || created || '$BACKUP_TIME_SEP' || dele
 if test "$BACKUP_PAR2_CPULIMIT" = "0"; then
 	cpulimit_cmd="wait \$par_pid"
 else
-	cpulimit_cmd="cpulimit -p \$par_pid -l $BACKUP_PAR2_CPULIMIT"
+	cpulimit_cmd="cpulimit -p \$par_pid -l $BACKUP_PAR2_CPULIMIT >/dev/null 2>&1"
 fi
 
 cmd="getfn() {
