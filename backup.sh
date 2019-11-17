@@ -6,6 +6,7 @@ test -z "$BACKUP_ROOT"    && exit 2
 
 test -z "$BACKUP_CURRENT" && BACKUP_CURRENT=$BACKUP_ROOT/current
 test -z "$BACKUP_FLOCK"   && BACKUP_FLOCK=$BACKUP_ROOT/lock
+test -z "$BACKUP_WAIT_FLOCK" # this is fine
 test -z "$BACKUP_FIFO"    && BACKUP_FIFO=$BACKUP_ROOT/fifo
 test -z "$BACKUP_MAIN"    && BACKUP_MAIN=$BACKUP_ROOT/data
 test -z "$BACKUP_RSYNC_LOGS" && BACKUP_RSYNC_LOGS=$BACKUP_ROOT/rsync.logs
@@ -20,9 +21,14 @@ test -z "$BACKUP_MAX_FREQ" && BACKUP_MAX_FREQ=8640
 
 SQLITE="sqlite3 $BACKUP_DB"
 
-# exit if there is another copy of this script running
 exec 200>"$BACKUP_FLOCK"
-flock -n 200 || exit 200
+if test -z "$BACKUP_WAIT_FLOCK"; then
+	# exit if there is another copy of this script running
+	flock -n 200 || exit 200
+else
+	# wait until there is no other copy of this script running
+	flock 200
+fi
 
 ### RSYNC ###
 
