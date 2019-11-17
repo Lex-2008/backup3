@@ -19,6 +19,11 @@ test -z "$BACKUP_TIME_SEP" && BACKUP_TIME_SEP="~" # must be regexp-safe
 test -z "$BACKUP_TIME_NOW" && BACKUP_TIME_NOW=now # must be 'now' or valid date in future
 test -z "$BACKUP_MAX_FREQ" && BACKUP_MAX_FREQ=8640
 
+# 2592000 is number of seconds / month
+# BACKUP_MAX_FREQ is number of events / month
+# hence 2592000/BACKUP_MAX_FREQ is number of seconds / event
+# usually 300 seconds for BACKUP_MAX_FREQ=8640 (5 minutes)
+BACKUP_MAX_FREQ_SEC="$(echo "2592000 $BACKUP_MAX_FREQ / p" | dc)"
 SQLITE="sqlite3 $BACKUP_DB"
 
 exec 200>"$BACKUP_FLOCK"
@@ -146,7 +151,11 @@ compare()
 				WHEN strftime('%Y-%m-%d %H', created,        '-1 second') !=
 				     strftime('%Y-%m-%d %H', '$BACKUP_TIME', '-1 second')
 				     THEN 720 -- different hour
-				ELSE $BACKUP_MAX_FREQ
+				WHEN strftime('%s', created,        '-1 second')/$BACKUP_MAX_FREQ_SEC !=
+				     strftime('%s', '$BACKUP_TIME', '-1 second')/$BACKUP_MAX_FREQ_SEC
+				     THEN $BACKUP_MAX_FREQ -- crosses BACKUP_MAX_FREQ boundary (usually 5 minutes)
+				ELSE 2592000 / (strftime('%s', '$BACKUP_TIME') - strftime('%s', created))
+				     -- 2592000 is number of seconds per month
 			END
 		WHERE freq = 0
 		  AND deleted = '$BACKUP_TIME';
