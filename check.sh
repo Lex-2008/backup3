@@ -302,7 +302,7 @@ if test -e check.sh; then
 fi
 rm check.*
 
-$SQLITE "CREATE INDEX IF NOT EXISTS check_tmp ON history(dirname, filename, created);ANALYZE;"
+$SQLITE "BEGIN TRANSACTION; DROP INDEX IF EXISTS history_update; CREATE INDEX IF NOT EXISTS check_tmp ON history(dirname, filename, created);ANALYZE; END TRANSACTION;"
 
 # Tests that might add new files in current
 check old2current
@@ -331,6 +331,6 @@ check current2old
 # This test should never fail
 check db_dups_freq0
 
-$SQLITE "DROP INDEX IF EXISTS check_tmp;VACUUM;"
+$SQLITE "DROP INDEX IF EXISTS check_tmp;CREATE UNIQUE INDEX history_update ON history(dirname, filename) WHERE freq = 0;VACUUM;"
 
 wc -l check.*
