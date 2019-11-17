@@ -315,11 +315,11 @@ check db2current
 check db2old
 check db_dups_created
 
-# Tests that might add new rows with wrong freq
-check old2db
-
 # Tests that might change created date (and invalidate freq)
 check db_overlaps
+
+# Tests that might add new rows with wrong freq
+check old2db
 
 # Tests that fix freq according to created/deleted
 check db_freq
