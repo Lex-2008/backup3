@@ -133,8 +133,11 @@ old2current ()
 			# dirname/filename/created~now
 			filename=\"\${1%/*}\"
 			if ! test -f \"$BACKUP_CURRENT/\$filename\"; then
-				echo \"ln \$1 => $BACKUP_CURRENT/\$filename\"
-				test -n \"$FIX\" && ln \"\$1\" \"$BACKUP_CURRENT/\$filename\"
+				echo \"ln $BACKUP_MAIN/\$1 => $BACKUP_CURRENT/\$filename\"
+				if test -n \"$FIX\"; then
+					mkdir -p \"$BACKUP_CURRENT/\${filename%/*}\"
+					ln \"$BACKUP_MAIN/\$1\" \"$BACKUP_CURRENT/\$filename\"
+				fi
 			fi
 			shift
 		done"
