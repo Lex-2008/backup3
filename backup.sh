@@ -24,6 +24,7 @@ test -z "$BACKUP_MAX_FREQ" && BACKUP_MAX_FREQ=8640
 # hence 2592000/BACKUP_MAX_FREQ is number of seconds / event
 # usually 300 seconds for BACKUP_MAX_FREQ=8640 (5 minutes)
 BACKUP_MAX_FREQ_SEC="$(echo "2592000 $BACKUP_MAX_FREQ / p" | dc)"
+
 SQLITE="sqlite3 $BACKUP_DB"
 
 exec 200>"$BACKUP_FLOCK"
@@ -57,7 +58,7 @@ run_rsync()
 	# test if we can connect
 	timeout rsync "$@" "$from" >/dev/null 2>&1 || return 0
 	# sync files
-	timeout -t "$BACKUP_TIMEOUT" rsync -a --itemize-changes --human-readable --stats --fake-super --delete --one-file-system "$@" "$from" "$BACKUP_CURRENT/$to" >"$logfile"
+	timeout -t "$BACKUP_TIMEOUT" rsync -a --itemize-changes --human-readable --stats --delete --one-file-system "$@" "$from" "$BACKUP_CURRENT/$to" >"$logfile"
 	# add them to DB
 	compare "$to"
 }
