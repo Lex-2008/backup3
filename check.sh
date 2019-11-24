@@ -44,7 +44,7 @@ db2current ()
 		while test \$# -ge 1; do
 			filename=\"\${1%%|*}\"
 			rowid=\"\${1##*|}\"
-			if ! test -e \"$BACKUP_CURRENT/\$filename\"; then
+			if ! test -f \"$BACKUP_CURRENT/\$filename\" -o -L \"$BACKUP_CURRENT/\$filename\"; then
 				echo \"$BACKUP_CURRENT/\$filename\" >>check.db2current
 				test -n \"$FIX\" && echo \"DELETE FROM history WHERE rowid='\$rowid';\"
 			fi
@@ -66,8 +66,8 @@ db2old ()
 		while test \$# -ge 1; do
 			filename=\"\${1%%|*}\"
 			rowid=\"\${1##*|}\"
-			if ! test -e \"$BACKUP_MAIN/\$filename\"; then
-				echo \"\$filename\" >>check.db2old
+			if ! test -f \"$BACKUP_MAIN/\$filename\" -o -L \"$BACKUP_MAIN/\$filename\"; then
+				echo \"$BACKUP_MAIN/\$filename\" >>check.db2old
 				test -n \"$FIX\" && echo \"DELETE FROM history WHERE rowid='\$rowid';\"
 			fi
 			shift
@@ -132,7 +132,7 @@ old2current ()
 			# $1 points to the file in data dir - i.e. it's like this:
 			# dirname/filename/created~now
 			filename=\"\${1%/*}\"
-			if ! test -f \"$BACKUP_CURRENT/\$filename\"; then
+			if ! test -f \"$BACKUP_CURRENT/\$filename\" -o -L \"$BACKUP_CURRENT/\$filename\"; then
 				echo \"ln $BACKUP_MAIN/\$1 => $BACKUP_CURRENT/\$filename\"
 				if test -n \"$FIX\"; then
 					mkdir -p \"$BACKUP_CURRENT/\${filename%/*}\"
