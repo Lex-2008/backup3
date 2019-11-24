@@ -67,7 +67,7 @@ cmd="	while test \$# -ge 1; do
 			continue
 		fi
 		# check *.par2 file
-		par2verify -q \"\$filepart.par2\" >\"$BACKUP_PAR2_LOG\" &
+		par2verify -q \"\$filepart.par2\" >\"$BACKUP_PAR2_LOG\" 2>&1 &
 		par_pid=\$!
 		$cpulimit_cmd
 		if wait \$par_pid; then
