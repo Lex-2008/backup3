@@ -3,8 +3,10 @@
 # Script to show contents of archive for a given date.
 #
 # Call it like this:
-# $ show.sh "2018-12-24 00:24" stuff /tmp/dir
-# to hard-link files from "stuff" directory in backup to /tmp/dir
+# $ show.sh "2018-12-24 00:24" ./stuff/ /tmp/dir
+# to hard-link files from "./stuff/" directory in backup to "/tmp/dir"
+# Note that "./stuff/" should begin with "./" and end with "/", as dirname are
+# stored in DB, but "/tmp/dir" might be without trailing slash.
 
 test -z "$BACKUP_ROOT"    && exit 2
 test -z "$BACKUP_MAIN"    && BACKUP_MAIN=$BACKUP_ROOT/data
