@@ -38,4 +38,4 @@ cmd="
 	done
 "
 
-$SQLITE "$sql" | tr '\n' '\0' | xargs -0 sh -c "$cmd" x | $SQLITE
+$SQLITE "$sql" | tr '\n' '\0' | xargs -0 sh -c "$cmd" x
