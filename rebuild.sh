@@ -34,9 +34,9 @@ echo "2: fill"
 	1i .timeout 10000
 	1i BEGIN TRANSACTION;
 	s/'/''/g        # duplicate single quotes
-	s_^([0-9]*) (.*/)([^/]*)/([^/$BACKUP_TIME_SEP]*)$BACKUP_TIME_SEP([^/$BACKUP_TIME_SEP]*)_	\\
-		INSERT INTO history (inode, dirname, filename, created, deleted, freq) VALUES	\\
-		('\\1', '\\2', '\\3', '\\4', '\\5', 0);_
+	s_^([0-9]*) (.*/)?([^/]*/)([^/]*)/([^/$BACKUP_TIME_SEP]*)$BACKUP_TIME_SEP([^/$BACKUP_TIME_SEP]*)_	\\
+		INSERT INTO history (inode, parent, dirname, filename, created, deleted, freq) VALUES	\\
+		('\\1', '\\2', '\\3', '\\4', '\\5', '\\6', 0);_
 	\$a END TRANSACTION;" | $SQLITE
 
 echo "3: update freq"

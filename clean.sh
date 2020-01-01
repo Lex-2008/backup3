@@ -46,7 +46,7 @@ check_space || exit 0 # no cleanup needed
 if test "$CLEAN_BY_FREQ" = "1"; then
 	# Uses 'timeline' index to get rows with freq!=0, then builds a temporary index for age.
 	# We can't have this index permanently, since it depends on _current_ time
-	sql="SELECT dirname || filename || '/' || created,
+	sql="SELECT parent || dirname || filename || '/' || created,
 			freq*(strftime('%s', 'now')-strftime('%s', deleted)) AS age,
 			rowid
 		FROM history
@@ -54,7 +54,7 @@ if test "$CLEAN_BY_FREQ" = "1"; then
 		ORDER BY age DESC;"
 else
 	# Uses 'timeline' index both for WHERE and for ORDER BY
-	sql="SELECT dirname || filename || '/' || created,
+	sql="SELECT parent || dirname || filename || '/' || created,
 			rowid
 		FROM history
 		WHERE freq != 0

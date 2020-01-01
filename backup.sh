@@ -42,7 +42,7 @@ fi
 run_rsync()
 {
 	when="$1"
-	to="$2"
+	to="$2" # note that "to" must NOT end with slash
 	from="$3"
 	shift 3
 	logfile="$BACKUP_RSYNC_LOGS/$to"
@@ -78,10 +78,10 @@ compare()
 	# prints nothing, but that's unlikely to happen IRL
 	sed="s/'/''/g        # duplicate single quotes
 		1i BEGIN TRANSACTION;
-		1i CREATE TEMPORARY TABLE fs (inode INTEGER, dirname TEXT, filename TEXT, freq INTEGER);
-		s_^([0-9]*) (.*/)([^/]*)_	\\
-			INSERT INTO fs (inode, dirname, filename)	\\
-			VALUES ('\\1', '\\2', '\\3');_
+		1i CREATE TEMPORARY TABLE fs (inode INTEGER, parent TEXT, dirname TEXT, filename TEXT, freq INTEGER);
+		s_^([0-9]*) (.*/)?([^/]*/)([^/]*)_	\\
+			INSERT INTO fs (inode, parent, dirname, filename)	\\
+			VALUES ('\\1', '\\2', '\\3', '\\4');_
 		\$a END TRANSACTION;"
 
 	# SQL expression to run after above import is complete
@@ -106,9 +106,10 @@ compare()
 		-- performance reasons and to ensure that long-deleted files do
 		-- not affect the result in case of inode reuse
 		CREATE TEMPORARY TABLE new_files AS
-			SELECT fs.inode, fs.dirname, fs.filename, '$BACKUP_TIME', '$BACKUP_TIME_NOW', 0
+			SELECT fs.inode, fs.parent, fs.dirname, fs.filename, '$BACKUP_TIME', '$BACKUP_TIME_NOW', 0
 			FROM fs LEFT JOIN history INDEXED BY history_update
 			ON  fs.inode = history.inode
+			AND fs.parent = history.parent
 			AND fs.dirname = history.dirname
 			AND fs.filename = history.filename
 			AND history.freq = 0 -- to make history INDEXED BY history_update
@@ -122,9 +123,9 @@ compare()
 		-- and so we skip entries in 'history' table which correspond to
 		-- files deleted long time ago.
 		CREATE TEMPORARY TABLE old_files AS
-			SELECT history.inode, history.dirname, history.filename, history.created, '$BACKUP_TIME', 0
+			SELECT history.inode, history.parent, history.dirname, history.filename, history.created, '$BACKUP_TIME', 0
 			FROM history INDEXED BY history_update LEFT JOIN fs
-			USING (inode, dirname, filename)
+			USING (inode, parent, dirname, filename)
 			WHERE fs.inode IS NULL
 			   AND history.freq = 0 -- to make history INDEXED BY history_update
 			   $sql_dir;
@@ -132,12 +133,13 @@ compare()
 		-- STEP 2: Update 'history' table.
 		-- Note that all rows in 'old_files' tables have corresponding
 		-- lines in 'history' table, so 'UNIQUE INDEX WHERE freq=0'
-		-- prevents them to be inserted, so existing lines in 'history'
-		-- are deleted. Effectively, the following statement only
-		-- changes 'deleted' date - sets it to current. 'freq' is
-		-- updated on next step - so we could use 'UNIQUE INDEX WHERE
-		-- freq=0' now.
-		INSERT OR REPLACE INTO history (inode, dirname, filename, created, deleted, freq) SELECT * FROM old_files;
+		-- causes a conflict, but 'OR REPLACE' part of query causes
+		-- existing lines to be deleted, and new ones to be inserted,
+		-- effectively replacing them. As a result, the following
+		-- statement only changes 'deleted' date - sets it to current.
+		-- 'freq' is updated on next step - so we could use 'UNIQUE
+		-- INDEX WHERE freq=0' now.
+		INSERT OR REPLACE INTO history (inode, parent, dirname, filename, created, deleted, freq) SELECT * FROM old_files;
 		-- And now we update 'freq'.
 		UPDATE history SET freq = CASE
 				WHEN strftime('%Y-%m', created,        '-1 second') !=
@@ -161,16 +163,18 @@ compare()
 		WHERE freq = 0
 		  AND deleted = '$BACKUP_TIME';
 		-- Now when 'freq' is changed, we can add entries abot new files
-		INSERT OR REPLACE INTO history (inode, dirname, filename, created, deleted, freq) SELECT * FROM new_files;
+		INSERT OR REPLACE INTO history (inode, parent, dirname, filename, created, deleted, freq) SELECT * FROM new_files;
+		-- Below command will do anything only in rare cases when a lot
+		-- of lines were changed. In most cases, it's a 'no-op'
 		PRAGMA optimize;
 		-- STEP 3: Print out lists of new and deleted files.
 		select 'first line';
 		-- List of new files
-		select dirname || filename from new_files;
+		select parent || dirname || filename from new_files;
 		select 'separator';
 		-- List of old files
 		-- Note that we print with partial filename in data dir
-		SELECT dirname || filename || '/' || created FROM old_files;
+		SELECT parent || dirname || filename || '/' || created FROM old_files;
 		"
 
 	# Shell command to operate on new files:
