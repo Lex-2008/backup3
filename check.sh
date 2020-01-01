@@ -52,7 +52,7 @@ db2current ()
 		done
 		echo 'END TRANSACTION;'
 		"
-	$SQLITE "SELECT dirname || filename,
+	$SQLITE "SELECT parent || dirname || filename,
 			rowid
 		FROM history
 		WHERE freq = 0
@@ -74,7 +74,7 @@ db2old ()
 		done
 		echo 'END TRANSACTION;'
 		"
-	$SQLITE "SELECT dirname || filename || '/' || created || '$BACKUP_TIME_SEP' || deleted,
+	$SQLITE "SELECT parent || dirname || filename || '/' || created || '$BACKUP_TIME_SEP' || deleted,
 			rowid
 		FROM history
 		ORDER BY dirname;" | tr '\n' '\0' | xargs -0 sh -c "$cmd" x | $SQLITE
@@ -83,7 +83,20 @@ db2old ()
 current2db ()
 {
 	test -n "$FIX" && echo "current2db: --fix is not supported"
-	/usr/bin/find "$BACKUP_CURRENT" \( -type f -o -type l \) -printf '%i ./%P\n' | sed -r "s/'/''/g;s_^([0-9]*) (.*/)([^/]*)_SELECT CASE WHEN EXISTS(SELECT 1 FROM history WHERE inode='\\1' AND dirname='\\2' AND filename='\\3' AND freq=0 LIMIT 1) THEN 1 ELSE '\\2\\3' END;_" | $SQLITE | fgrep -v -x 1 >"$BACKUP_ROOT/check.current2db"
+	/usr/bin/find "$BACKUP_CURRENT" $BACKUP_FIND_FILTER \( -type f -o -type l \) -printf "%i ./%P\\n" | sed -r "
+		s/'/''/g;
+		s_^([0-9]*) (.*/)?([^/]*/)([^/]*)_	\\
+	 SELECT CASE	\\
+		WHEN EXISTS(	\\
+			SELECT 1	\\
+			FROM history	\\
+			WHERE inode='\\1'	\\
+			  AND parent='\\2'	\\
+			  AND dirname='\\3'	\\
+			  AND filename='\\4'	\\
+			  AND freq=0)	\\
+		THEN 1	\\
+		ELSE '\\2\\3\\4' END;_" | $SQLITE | fgrep -v -x 1 >"$BACKUP_ROOT/check.current2db"
 }
 
 old2db ()
@@ -92,17 +105,18 @@ old2db ()
 		/usr/bin/find "$BACKUP_MAIN" \( -type f -o -type l \) -name "*$BACKUP_TIME_SEP$BACKUP_TIME_NOW" -printf '%i ./%P\n' | sed -r "
 		s/'/''/g;
 		1i BEGIN TRANSACTION;
-		s_^([0-9]*) (.*/)([^/]*)/([^/$BACKUP_TIME_SEP]*)$BACKUP_TIME_SEP([^/$BACKUP_TIME_SEP]*)\$_	\\
-			INSERT INTO history(inode, dirname, filename, created, deleted, freq)	\\
-			SELECT '\\1', '\\2', '\\3', '\\4', '\\5', 0	\\
+		s_^([0-9]*) (.*/)?([^/]*/)([^/]*)/([^/$BACKUP_TIME_SEP]*)$BACKUP_TIME_SEP([^/$BACKUP_TIME_SEP]*)\$_	\\
+			INSERT INTO history(inode, parent, dirname, filename, created, deleted, freq)	\\
+			SELECT '\\1', '\\2', '\\3', '\\4', '\\5', '\\6', 0	\\
 			WHERE NOT EXISTS (	\\
 				SELECT 1	\\
 				FROM history	\\
-				WHERE dirname='\\2'	\\
-				  AND filename='\\3'	\\
-				  AND created='\\4'	\\
-				  AND deleted='\\5'	\\
-				  AND inode='\\1'	\\
+				WHERE inode='\\1'	\\
+				  AND parent='\\2'	\\
+				  AND dirname='\\3'	\\
+				  AND filename='\\4'	\\
+				  AND created='\\5'	\\
+				  AND deleted='\\6'	\\
 				LIMIT 1);	\\
 			_
 		  \$a END TRANSACTION;
@@ -110,17 +124,20 @@ old2db ()
 	else
 		/usr/bin/find "$BACKUP_MAIN" \( -type f -o -type l \) -name "*$BACKUP_TIME_SEP$BACKUP_TIME_NOW" -printf '%i ./%P\n' | sed -r "
 		s/'/''/g;
-		s_^([0-9]*) (.*/)([^/]*)/([^/$BACKUP_TIME_SEP]*)$BACKUP_TIME_SEP([^/$BACKUP_TIME_SEP]*)\$_	\\
-		SELECT CASE WHEN EXISTS	\\
-		  (SELECT 1	\\
-		   FROM history	\\
-		   WHERE dirname='\\2'	\\
-		     AND filename='\\3'	\\
-		     AND created='\\4'	\\
-		     AND deleted='\\5'	\\
-		     AND inode='\\1'	\\
-		   LIMIT 1) THEN 1	\\
-                  ELSE '\\2\\3/\\4$BACKUP_TIME_SEP\\5'	\\
+		s_^([0-9]*) (.*/)?([^/]*/)([^/]*)/([^/$BACKUP_TIME_SEP]*)$BACKUP_TIME_SEP([^/$BACKUP_TIME_SEP]*)\$_	\\
+		SELECT CASE	\\
+			WHEN EXISTS (	\\
+				SELECT 1	\\
+				FROM history	\\
+				WHERE inode='\\1'	\\
+				  AND parent='\\2'	\\
+				  AND dirname='\\3'	\\
+				  AND filename='\\4'	\\
+				  AND created='\\5'	\\
+				  AND deleted='\\6'	\\
+				LIMIT 1) \\
+			THEN 1	\\
+                  ELSE '\\2\\3\\4/\\5$BACKUP_TIME_SEP\\6'	\\
 		  END;_
 		  " | $SQLITE | fgrep -v -x 1 >"$BACKUP_ROOT/check.old2db"
 	fi
@@ -193,16 +210,17 @@ db_overlaps ()
 		echo 'END TRANSACTION;'
 		"
 	$SQLITE "SELECT
-			a.dirname || a.filename || '/' || a.created || '$BACKUP_TIME_SEP' || a.deleted,
-			a.dirname || a.filename || '/' || a.created || '$BACKUP_TIME_SEP' || b.created,
+			a.parent || a.dirname || a.filename || '/' || a.created || '$BACKUP_TIME_SEP' || a.deleted,
+			a.parent || a.dirname || a.filename || '/' || a.created || '$BACKUP_TIME_SEP' || b.created,
 			'UPDATE history SET deleted = \"' || b.created || '\" WHERE rowid = \"' || a.rowid || '\";'
 		FROM history AS a, history AS b
 		WHERE a.created < b.created
+			AND a.parent = b.parent
 			AND a.dirname = b.dirname
 			AND a.filename = b.filename
 			AND a.created < b.deleted
 			AND b.created < a.deleted
-		GROUP BY a.dirname, a.filename, a.created;
+		GROUP BY a.parent, a.dirname, a.filename, a.created;
 		" | tr '\n' '\0' | xargs -0 sh -c "$cmd" x | $SQLITE
 }
 
@@ -214,7 +232,7 @@ db_order ()
 			shift
 		done
 		"
-	$SQLITE "SELECT dirname || filename || '/' || created || '$BACKUP_TIME_SEP' || deleted
+	$SQLITE "SELECT parent || dirname || filename || '/' || created || '$BACKUP_TIME_SEP' || deleted
 		FROM history
 		WHERE created >= deleted;" | tr '\n' '\0' | xargs -0 sh -c "$cmd" x >check.db_order
 }
@@ -231,10 +249,11 @@ db_dups_created ()
 			SELECT *
 			FROM history AS b
 			-- check that they're duplicates
-			WHERE history.dirname = b.dirname
+			WHERE history.rowid != b.rowid
+			AND history.parent = b.parent
+			AND history.dirname = b.dirname
 			AND history.filename = b.filename
 			AND history.created = b.created
-			AND history.rowid != b.rowid
 			-- check when to delete 'history' row, not the other one
 			AND ( history.freq = 0 AND b.freq != 0
 				OR (
@@ -252,6 +271,7 @@ db_dups_freq0 ()
 		history AS b
 		WHERE a.freq = 0
 			AND a.rowid < b.rowid
+			AND a.parent = b.parent
 			AND a.dirname = b.dirname
 			AND a.filename = b.filename
 			AND b.freq = 0
@@ -302,7 +322,7 @@ if test -e check.sh; then
 fi
 rm check.*
 
-$SQLITE "BEGIN TRANSACTION; DROP INDEX IF EXISTS history_update; CREATE INDEX IF NOT EXISTS check_tmp ON history(dirname, filename, created);ANALYZE; END TRANSACTION;"
+$SQLITE "BEGIN TRANSACTION; DROP INDEX IF EXISTS history_update; CREATE INDEX IF NOT EXISTS check_tmp ON history(parent, dirname, filename, created);ANALYZE; END TRANSACTION;"
 
 # Tests that might add new files in current
 check old2current
@@ -331,6 +351,6 @@ check current2old
 # This test should never fail
 check db_dups_freq0
 
-$SQLITE "DROP INDEX IF EXISTS check_tmp;CREATE UNIQUE INDEX history_update ON history(dirname, filename) WHERE freq = 0;VACUUM;"
+$SQLITE "DROP INDEX IF EXISTS check_tmp;CREATE UNIQUE INDEX history_update ON history(parent, dirname, filename) WHERE freq = 0;VACUUM;"
 
 wc -l check.*
