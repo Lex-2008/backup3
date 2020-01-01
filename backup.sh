@@ -70,7 +70,17 @@ compare()
 	dir="$1" # if arg is passed, we're processing only one dir
 	if test -n "$dir"; then
 		ddir="$dir/"
-		sql_dir="AND history.dirname LIKE './$ddir%'"
+		sql_dir="AND (
+				( -- list all files in given dir
+					history.parent = './'
+					AND
+					history.dirname = '$dir/'
+				)
+				OR
+				( -- and in all of its subdirs
+					history.parent LIKE './$dir/%'
+				)
+			)"
 	fi
 
 	# sed expression to convert `find` output into SQL query which imports
