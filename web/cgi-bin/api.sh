@@ -9,28 +9,48 @@ test -z "$BACKUP_PASS"    && BACKUP_PASS=$BACKUP_ROOT/pass.txt
 test -z "$BACKUP_DB"      && BACKUP_DB=$BACKUP_ROOT/backup.db
 test -z "$BACKUP_TIME_SEP" && BACKUP_TIME_SEP="~"
 test -z "$BACKUP_TIME_NOW" && BACKUP_TIME_NOW=now
+test -z "$BACKUP_MAX_FREQ" && BACKUP_MAX_FREQ=8640
 
 SQLITE="sqlite3 $BACKUP_DB"
 
-# init <<returns list of roots
-# timeline|pass|root
-#  dirtree|pass|root
-#       ls|pass|dir|date
-#      tar|pass|dir|date
-#      get|pass|dir|date|file
-#       ll|pass|dir|*|file
+MODE=simple
+
+# init <<in complex mode, returns list of root dirs
+#  dirtree|root
+#       ls|dir|date
+# timeline|dir
+#      tar|dir|date
+#      get|dir|date|file
+#       ll|dir|*|file
 
 if test "$QUERY_STRING" = "|init"; then
 	echo "HTTP/1.0 200 OK"
 	echo "Cache-Control: max-age=600"
+	echo "Content-Encoding: gzip"
 	echo
-	ls -p "$BACKUP_CURRENT"
+	if test "$MODE" = 'simple'; then
+		echo | gzip
+		# # print whole dirtree
+		# # Note: this is not indexed. Not sure if it can be, or if it
+		# # worth it (this api gets called only once)
+		# $SQLITE "SELECT dirname, MIN(created), MAX(deleted)
+		# 	FROM history
+		# 	GROUP BY dirname;" | gzip
+	else
+		# print only roots
+		ls -p "$BACKUP_CURRENT" | gzip
+		# # print nothing
+		# echo | gzip
+	fi
+	# TODO: create index on dirname in background
 	exit 0
 fi
+
 
 IFS='|' read -r pass request dir date file <<EOL
 $(busybox httpd -d "$QUERY_STRING")
 EOL
+# TODO: clean them from '
 
 # TODO
 # # protect agains hacks like 'asd/../../../../'
@@ -46,7 +66,8 @@ EOL
 # 	exit 0
 # fi
 
-root="${dir%%/*}"
+root="${dir#./}"
+root="${root%%/*}"
 
 # check root-pass by trying to SMB into requested share
 if test -f "$BACKUP_CURRENT/$root.pw"; then
@@ -62,64 +83,75 @@ EOL
 		echo "$BACKUP_CURRENT/$root.pw"
 		cat  "$BACKUP_CURRENT/$root.pw"
 		echo "[$user][$pass][$share]"
-		echo smbclient -U "$user" -c exit "$share" "$pass"
+		echo smbclient -U "$user" -c exit "$share" "$pass" 2>&1
 		exit 1
 	fi
 fi
 
 case "$request" in
-	(all)
+	(dirtree)
+		if test -z "$root"; then
+			if test "$MODE" != 'simple'; then
+				echo "HTTP/1.0 403 Forbidden"
+				echo
+				echo "root dirtree request in complex mode"
+				exit 1
+			fi
+		else
+			root_conition="WHERE dirname LIKE './$root/%'"
+		fi
 		echo "HTTP/1.0 200 OK"
 		echo "Cache-Control: max-age=600"
 		echo "Content-Encoding: gzip"
 		echo
-		# TODO: rewrite it using
-		# CASE instr(dirname, "/") WHEN 0 THEN dirname ELSE substr(dirname, 1, instr(dirname, "/")-1) END = '$root'
-		# and create expression index like this:
-		# CREATE INDEX all ON history(
-		# CASE instr(dirname, "/") WHEN 0 THEN dirname ELSE substr(dirname, 1, instr(dirname, "/")-1) END );
-		# and check if it make below request faster
-		# (Note that expression indexes are supported only on SQLite 3.9.0+)
+		# Note: this is not indexed. Could be rewritten using expression
+		# indexes (they are supported only on SQLite 3.9.0+), but not
+		# sure if it worth it (this api gets called only when opening a
+		# root)
 		$SQLITE "PRAGMA case_sensitive_like = ON;
-		SELECT *
+			SELECT dirname, MIN(created), MAX(deleted)
 			FROM history
-			WHERE dirname = '$root'
-			   OR dirname LIKE '$root/%';" | gzip
-	        ;;
-	(timeline)
-		echo "HTTP/1.0 200 OK"
-		echo "Cache-Control: max-age=600"
-		echo
-		# TODO: create dirname index for this
-		$SQLITE "PRAGMA case_sensitive_like = ON;
-		ATTACH DATABASE ':memory:' AS mem;
-		CREATE TABLE mem.api AS
-		SELECT created, deleted, dirname, freq
-			FROM history
-			WHERE dirname = '$root'
-			   OR dirname LIKE '$root/%';
-		SELECT DISTINCT created FROM api;
-		SELECT '---';
-		SELECT DISTINCT deleted FROM api;
-		SELECT '===';
-		SELECT freq, MIN(deleted)
-			FROM api
-			WHERE freq != 0
-			GROUP BY freq;
-		SELECT '+++';
-		SELECT dirname, MIN(created), MAX(deleted)
-			FROM api
-			GROUP BY dirname;"
+			$root_conition
+			GROUP BY dirname;" | gzip
 	;;
 	(ls)
 		echo "HTTP/1.0 200 OK"
 		echo "Cache-Control: max-age=600"
 		echo
+		# TODO: create dirname index for this, since it gets called on
+		# every dir open
 		$SQLITE "SELECT filename, created || '$BACKUP_TIME_SEP' || deleted
 			FROM history
 			WHERE dirname = '$dir'
 			  AND created <= '$date'
 			  AND deleted > '$date';"
+	;;
+	(timeline)
+		echo "HTTP/1.0 200 OK"
+		echo "Cache-Control: max-age=600"
+		# echo "Content-Encoding: gzip"
+		echo
+		# TODO: create dirname index for this, since it gets called on
+		# every dir open
+		$SQLITE "PRAGMA case_sensitive_like = ON;
+		ATTACH DATABASE ':memory:' AS mem;
+		CREATE TABLE mem.api AS
+		SELECT created, deleted,
+			CASE
+				WHEN freq >= $BACKUP_MAX_FREQ THEN freq
+				ELSE 43800 -- every minute
+			END AS freq
+		FROM history
+		WHERE dirname = '$dir'
+		  AND freq != 0;
+		SELECT datetime(created) FROM api
+		UNION
+		SELECT datetime(deleted) FROM api;
+		SELECT '===';
+		SELECT freq, datetime(MIN(deleted))
+			FROM api
+			-- WHERE freq != 0 -- already covered above
+			GROUP BY freq;" # | gzip
 	;;
 	(tar)
 		export BACKUP_ROOT BACKUP_MAIN BACKUP_DB
