@@ -27,6 +27,6 @@ CREATE TABLE history(
 "
 
 test "$1" = "--noindex" || $SQLITE "
-CREATE UNIQUE INDEX history_update ON history(dirname, filename) WHERE freq = 0;
+CREATE UNIQUE INDEX history_update ON history(parent, dirname, filename) WHERE freq = 0;
 CREATE INDEX timeline ON history(freq, deleted) WHERE freq != 0;
 "
