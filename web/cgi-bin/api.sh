@@ -16,7 +16,6 @@ SQLITE="sqlite3 $BACKUP_DB"
 MODE=simple
 
 # init <<in complex mode, returns list of root dirs
-#  dirtree|root
 #       ls|dir|date
 # timeline|dir
 #      tar|dir|date
@@ -26,23 +25,9 @@ MODE=simple
 if test "$QUERY_STRING" = "|init"; then
 	echo "HTTP/1.0 200 OK"
 	echo "Cache-Control: max-age=600"
-	echo "Content-Encoding: gzip"
 	echo
-	if test "$MODE" = 'simple'; then
-		echo | gzip
-		# # print whole dirtree
-		# # Note: this is not indexed. Not sure if it can be, or if it
-		# # worth it (this api gets called only once)
-		# $SQLITE "SELECT dirname, MIN(created), MAX(deleted)
-		# 	FROM history
-		# 	GROUP BY dirname;" | gzip
-	else
-		# print only roots
-		ls -p "$BACKUP_CURRENT" | gzip
-		# # print nothing
-		# echo | gzip
-	fi
 	# TODO: create index on dirname in background
+	echo .
 	exit 0
 fi
 
@@ -52,8 +37,7 @@ $(busybox httpd -d "$QUERY_STRING")
 EOL
 # TODO: clean them from '
 
-# TODO
-# # protect agains hacks like 'asd/../../../../'
+# # TODO: protect agains hacks like 'asd/../../../../'
 # # also protect against accessing password-protected dirs via 'public/../private/..'
 # # maybe match for '(^|/)..(/|$)' would be enough?
 # file="$(realpath --no-symlinks -m "$PWD/$request")"
@@ -89,42 +73,19 @@ EOL
 fi
 
 case "$request" in
-	(dirtree)
-		if test -z "$root"; then
-			if test "$MODE" != 'simple'; then
-				echo "HTTP/1.0 403 Forbidden"
-				echo
-				echo "root dirtree request in complex mode"
-				exit 1
-			fi
-		else
-			root_conition="WHERE dirname LIKE './$root/%'"
-		fi
-		echo "HTTP/1.0 200 OK"
-		echo "Cache-Control: max-age=600"
-		echo "Content-Encoding: gzip"
-		echo
-		# Note: this is not indexed. Could be rewritten using expression
-		# indexes (they are supported only on SQLite 3.9.0+), but not
-		# sure if it worth it (this api gets called only when opening a
-		# root)
-		$SQLITE "PRAGMA case_sensitive_like = ON;
-			SELECT dirname, MIN(created), MAX(deleted)
-			FROM history
-			$root_conition
-			GROUP BY dirname;" | gzip
-	;;
 	(ls)
 		echo "HTTP/1.0 200 OK"
 		echo "Cache-Control: max-age=600"
 		echo
 		# TODO: create dirname index for this, since it gets called on
 		# every dir open
-		$SQLITE "SELECT filename, created || '$BACKUP_TIME_SEP' || deleted
+		$SQLITE "SELECT filename, type, created || '$BACKUP_TIME_SEP' || deleted
 			FROM history
 			WHERE dirname = '$dir'
 			  AND created <= '$date'
-			  AND deleted > '$date';"
+			  AND deleted > '$date'
+			  AND filename!='.'
+			  ORDER BY type, filename;"
 	;;
 	(timeline)
 		echo "HTTP/1.0 200 OK"

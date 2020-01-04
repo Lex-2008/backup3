@@ -17,26 +17,6 @@ api=async(params, returnBlob)=>{
 	}
 }
 
-// api=(params, returnBlob)=>{
-// 	var url=params;
-// 	return fetch(`/cgi-bin/api.sh?${pass}|${params}`).then(a=>{
-// 		if(a.status==403){
-// 			// ask for a password
-// 			if(pass=prompt('[username] password',pass)){
-// 				// retry with a new password
-// 				return api(url, returnBlob);
-// 			} else {
-// 				// abort
-// 				Promise.reject('bad pass');
-// 			}
-// 		} else if(returnBlob) {
-// 			return a.blob();
-// 		} else {
-// 			return a.text();
-// 		}
-// 	});
-// }
-
 mode='unknown';
 root_dirs=[];
 timeline=[];
@@ -45,154 +25,13 @@ pass='';
 path='./';
 time='current';
 file='';
-file_time='';
-dirtree={};
-
-// add dir to dirtree
-addDir=(dirname, created, deleted)=>{
-	var recurse=false;
-	if(dirtree[dirname]){
-		if(created<dirtree[dirname].created) {
-			dirtree[dirname].created=created;
-			recurse=true;
-		}
-		if(deleted>dirtree[dirname].deleted){
-			dirtree[dirname].deleted=deleted;
-			recurse=true;
-		}
-	} else {
-		dirtree[dirname]={
-			created:created,
-			deleted:deleted,
-			children:{},
-		}
-		recurse=true;
-	}
-	// var shortname=dirname.match('[^/]*$')[0];
-	var shortname=dirname.slice(dirname.slice(0,-1).lastIndexOf('/')+1);
-	var parent=dirname.slice(0,-shortname.length);
-	if(parent){
-		if(recurse)
-			addDir(parent,created,deleted);
-		dirtree[parent].children[shortname]=1;
-	}
-}
-
-// add dir to dirtree, if needed
-ensureDirInDirtree=async(dir)=>{
-	if(dirtree[dir]) return true;
-	// in complex mode, root dir is treated separately
-	if(dir=='./' && mode=='complex') return true;
-	// TODO: first try without pass,
-	// if it suceeds - keep using without pass but remember the old pass
-	// if it fails - try with old pass
-	pass='';
-	if(mode=='complex'){
-		// TODO: we should request root here
-		var a=await api(`dirtree|${dir}`);
-	} else {
-		var a=await api(`dirtree`);
-	}
-	a.split('\n').filter(a=>!!a).forEach(a=>{
-		a=a.split('|');
-		addDir(a[0],a[1],a[2]);
-	});
-	if(dirtree[dir]) return true;
-	// if(dirtree[dir+'/']) return true;
-	while(dir!=='./'){
-		var idx=dir.lastIndexOf('/',dir.length-2);
-		if(idx<2) return false; // failure
-		dir = dir.substr(0, idx+1);
-		if(dirtree[dir]){
-			// TODO: change window.localtion.hash
-			return;
-		}
-	}
-	return false; // failure
-}
-
-
-// start
-init=async ()=>{
-	pass='';
-	var a=await api('init');
-	root_dirs=a.trim().split('\n').filter(a=>a.endsWith('/')).map(a=>a.slice(0,-1));
-	mode=(root_dirs.length>0)?'complex':'simple';
-};
-
-// // TODO
-// window.onhashchange=()=>{
-// 	// #dir|dir-date|file|file-date
-// 	var loc=decodeURIComponent(location.hash.slice(1)).split('|');
-// 	// First, check if dir exists in dirtree
-// 	if(dirtree[loc[0]]){
-// 		path=loc[0];
-// 		// Now, check if time is valid
-// 		var time_index=-1;
-// 		time='';
-// 		if(loc.length>1){
-// 			time=loc[1];
-// 		}
-// 		file='';
-// 		if(loc.length>2){
-// 			file=loc[2];
-// 		}
-// 		file_time='';
-// 		if(loc.length>3){
-// 			file_time=loc[3];
-// 		}
-// 		render();
-// 	} else {
-// 		// Dir not found.
-// 		// TODO
-// 		// It means that location refers to another backup
-// 		// First, find which backup location.hash refers to
-// 		var backup=backups.filter(a=>loc[0].startsWith(a)).sort((a,b)=>(a.length-b.length)).pop();
-// 		if(backup){
-// 			// Second, find if current dirtree refers to the same backup as location.hash does
-// 			// (we've just found it on the previous step)
-// 			if(!dirtree[backup]) {
-// 				// Nope, dirtree is either empty or refers to a different backup.
-// 				// in this case we fill it anew with the new backup
-// 				// (fillTimeline will call window.onhashchange again)
-// 				fillTimeline(backup);
-// 			} else {
-// 				// Yes, dirtree refers to the same backup as location.hash.
-// 				// It means that location.hash has a wrong dir.
-// 				// It would be smart to count number of slashes in location.hash
-// 				// in order to find path and preserve it, while replacing time with more current one,
-// 				// but for now we just reset location.hash to a backup root.
-// 				location.hash='#'+backup;
-// 				// window.onhashchange();
-// 			}
-// 		} else {
-// 			// None of backups was found in location.hash.
-// 			// It means the link is very wrong.
-// 			// Assuming list of backups is already loaded, go to a first backup
-// 			location.hash='#'+backups[0];
-// 			// window.onhashchange();
-// 		}
-// 	}
-// }
-
-
-ls_dirs=(dir,at)=>{
-	if(dir=='./' && mode=='complex'){
-		var subdirs = root_dirs;
-	} else {
-		var subdirs = Object.keys(dirtree[dir].children).filter(a=>{
-			var child=dirtree[`${dir}${a}`];
-			return child.created<=at && child.deleted>at;
-		})
-	}
-	return subdirs.map(a=>`<a class="dir" href="#${dir}${a}|${at}">${a}</a>`).join('');
-}
 
 ls=async(dir,at)=>{
-	// $('#here').innerHTML=ls_dirs(dir,at);
+	// TODO: set timeout to clear everything after
 	var a=await api(`ls|${dir}|${at}`)
-	$('#here').innerHTML=ls_dirs(dir,at)+(
-			a.split('\n').filter(a=>!!a).sort().map(a=>a.split('|')).map(a=>
+	$('#here').innerHTML=a.split('\n').filter(a=>!!a).map(a=>a.split('|')).map(a=>
+			//a=['filename','type','created~deleted']
+			(a[1]=='d')?(`<a class="dir" href="#${dir}${a[0]}/|${at}">${a[0]}</a>`):
 				($('#file_show').checked)?(
 					// show info about file
 					`<a class="file" href="#${dir}|${at}|${a[0]}">${a[0]}</a>`
@@ -202,7 +41,7 @@ ls=async(dir,at)=>{
 					       ):(
 						       // downlad file directly
 						       `<a class="file" href="/cgi-bin/api.sh?|get|${dir}|${a[1]}|${a[0]}">${a[0]}</a>`
-						 )).join(''));
+						 )).join('');
 	if(pass){
 		// show tar-btn
 		$('#tar-lnk').style.display='none';
@@ -276,7 +115,6 @@ fetchTimeline=async(dir)=>{
 	var idx=data.indexOf('===');
 	var changes=data.slice(0,idx);
 	ticks=[];
-	// TODO: add created/deleted times from dirtree
 	var freqtimes={}; // all possible times received via 
 	data.slice(idx+1).map(a=>a.split('|')).forEach(a=>{
 		var e=a[1].match(/^([0-9]*)-([0-9]*)-([0-9]*) ([0-9]*):([0-9]*):([0-9]*)$/);
@@ -341,7 +179,6 @@ fillTimeline=async(dir, current)=>{
 	sortedInsert(timeline, current);
 	ticks.push(timeline[timeline.length-1]);
 	$('#marks').innerHTML=ticks.map(a=>timeline.indexOf(a)).filter(a=>a!=-1).map(a=>`<option value="${a}">`).join('\n');
-
 	$('#q').max=timeline.length-1;
 	$('#q').value=timeline.indexOf(current);
 	$('#q').oninput=function(){
@@ -356,12 +193,8 @@ render=async()=>{
 			`<a href="#${a.slice(0,i+1).join('/')}/|${time}">${decodeURIComponent(v)}</a>`
 			).join('/');
 
-	// TODO: check return code
-	await ensureDirInDirtree(path);
 	await ls(path,time);
-	// await fillTimeline(path,time);
-	fillTimeline(path,time);
-
+	/*await*/ fillTimeline(path,time);
 	if(!file){
 		$('#file_group').style.display='none';
 		return;
@@ -430,27 +263,15 @@ $('#tar-btn').onclick=()=>getFile(`tar|${path}|${time}`,path.replace(/.*[\/]/,''
 window.onhashchange=()=>{
 	// #dir|dir-date|file|file-date
 	var loc=decodeURIComponent(location.hash.slice(1)).split('|');
-	path='./';
-	if(loc.length>0){
-		path=loc[0];
-	}
-	time='current';
-	if(loc.length>1){
-		time=loc[1];
-	}
-	file='';
-	if(loc.length>2){
-		file=loc[2];
-	}
-	file_time='';
-	if(loc.length>3){
-		file_time=loc[3];
-	}
+	path=loc[0]||'./';
+	time=loc[1]||'current';
+	file=loc[2]||'';
+	file_time=loc[3]||'';
 	render();
 }
 
 // INIT
-init();
+// init();
 window.onhashchange();
 
 
