@@ -56,6 +56,30 @@ db2current ()
 			rowid
 		FROM history
 		WHERE freq = 0
+		  AND type != 'd'
+		ORDER BY dirname;" | tr '\n' '\0' | xargs -0 sh -c "$cmd" x | $SQLITE
+}
+
+db2current_dirs ()
+{
+	cmd="	echo '.timeout 10000'
+		echo 'BEGIN TRANSACTION;'
+		while test \$# -ge 1; do
+			filename=\"\${1%%|*}\"
+			rowid=\"\${1##*|}\"
+			if ! test -d \"$BACKUP_CURRENT/\$filename\"; then
+				echo \"$BACKUP_CURRENT/\$filename\" >>check.db2current_dirs
+				test -n \"$FIX\" && echo \"DELETE FROM history WHERE rowid='\$rowid';\"
+			fi
+			shift
+		done
+		echo 'END TRANSACTION;'
+		"
+	$SQLITE "SELECT dirname || filename,
+			rowid
+		FROM history
+		WHERE freq = 0
+		  AND type = 'd'
 		ORDER BY dirname;" | tr '\n' '\0' | xargs -0 sh -c "$cmd" x | $SQLITE
 }
 
@@ -77,13 +101,34 @@ db2old ()
 	$SQLITE "SELECT dirname || filename || '/' || created || '$BACKUP_TIME_SEP' || deleted,
 			rowid
 		FROM history
+		WHERE type != 'd'
 		ORDER BY dirname;" | tr '\n' '\0' | xargs -0 sh -c "$cmd" x | $SQLITE
 }
 
 current2db ()
 {
 	test -n "$FIX" && echo "current2db: --fix is not supported"
-	/usr/bin/find "$BACKUP_CURRENT" \( -type f -o -type l \) -printf '%i ./%P\n' | sed -r "s/'/''/g;s_^([0-9]*) (.*/)([^/]*)_SELECT CASE WHEN EXISTS(SELECT 1 FROM history WHERE inode='\\1' AND dirname='\\2' AND filename='\\3' AND freq=0 LIMIT 1) THEN 1 ELSE '\\2\\3' END;_" | $SQLITE | fgrep -v -x 1 >"$BACKUP_ROOT/check.current2db"
+	/usr/bin/find "$BACKUP_CURRENT" -not -type d -printf '%i ./%P\n' | sed -r "s/'/''/g;s_^([0-9]*) (.*/)([^/]*)_SELECT CASE WHEN EXISTS(SELECT 1 FROM history WHERE inode='\\1' AND dirname='\\2' AND filename='\\3' AND freq=0 AND type != 'd' LIMIT 1) THEN 1 ELSE '\\2\\3' END;_" | $SQLITE | fgrep -v -x 1 >"$BACKUP_ROOT/check.current2db"
+}
+
+current2db_dirs ()
+{
+	test -n "$FIX" && echo "current2db_dirs: --fix is not supported"
+	( cd "$BACKUP_CURRENT"; /usr/bin/find -type d -printf '%i %h/%f\n' ) | sed -r "
+	s/'/''/g
+	s_^([0-9]*) (.*/)([^/]*)_	\\
+	SELECT CASE	\\
+		WHEN EXISTS(	\\
+			SELECT 1	\\
+			FROM history	\\
+			WHERE inode='\\1'	\\
+			AND dirname='\\2'	\\
+			AND filename='\\3'	\\
+			AND freq=0	\\
+			AND type = 'd'	\\
+			LIMIT 1	\\
+		) THEN 1	\\
+		ELSE '\\1|\\2|\\3' END;_" | $SQLITE | fgrep -v -x 1 >"$BACKUP_ROOT/check.current2db_dirs"
 }
 
 old2db ()
@@ -103,6 +148,7 @@ old2db ()
 				  AND created='\\4'	\\
 				  AND deleted='\\5'	\\
 				  AND inode='\\1'	\\
+				  AND type!='d'	\\
 				LIMIT 1);	\\
 			_
 		  \$a END TRANSACTION;
@@ -119,6 +165,7 @@ old2db ()
 		     AND created='\\4'	\\
 		     AND deleted='\\5'	\\
 		     AND inode='\\1'	\\
+		     AND type!='d'	\\
 		   LIMIT 1) THEN 1	\\
                   ELSE '\\2\\3/\\4$BACKUP_TIME_SEP\\5'	\\
 		  END;_
@@ -141,7 +188,7 @@ old2current ()
 			fi
 			shift
 		done"
-	/usr/bin/find "$BACKUP_MAIN" \( -type f -o -type l \) -name "*$BACKUP_TIME_SEP$BACKUP_TIME_NOW" -printf '%P\0' | xargs -0 sh -c "$cmd" x >"$BACKUP_ROOT/check.old2current"
+	/usr/bin/find "$BACKUP_MAIN" -not -type d -name "*$BACKUP_TIME_SEP$BACKUP_TIME_NOW" -printf '%P\0' | xargs -0 sh -c "$cmd" x >"$BACKUP_ROOT/check.old2current"
 }
 
 current2old ()
@@ -152,7 +199,7 @@ current2old ()
 			ls -i \"$BACKUP_MAIN/\$fullname\" 2>/dev/null | grep -q \"^ *\$inode \" || echo \"\$fullname\"
 			shift
 		done"
-	/usr/bin/find "$BACKUP_CURRENT" \( -type f -o -type l \) -printf '%i|%P\0' | xargs -0 sh -c "$cmd" x | (
+	/usr/bin/find "$BACKUP_CURRENT" -not -type d -printf '%i|%P\0' | xargs -0 sh -c "$cmd" x | (
 		if test -n "$FIX"; then
 			cd "$BACKUP_CURRENT"
 			# These files might either be in DB, or not. If they
@@ -312,6 +359,7 @@ check db_order
 
 # Tests that might delete some DB rows
 check db2current
+check db2current_dirs
 check db2old
 check db_dups_created
 
@@ -326,6 +374,7 @@ check db_freq
 
 # Tests that remove files from files.txt
 check current2db
+check current2db_dirs
 check current2old
 
 # This test should never fail

@@ -18,6 +18,7 @@ test "$1" = "--notable" || $SQLITE "
 PRAGMA journal_mode=WAL;
 CREATE TABLE history(
 	inode INTEGER,
+	type TEXT,
 	dirname TEXT,
 	filename TEXT,
 	created TEXT,

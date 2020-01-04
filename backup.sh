@@ -68,9 +68,10 @@ run_rsync()
 compare()
 {
 	dir="$1" # if arg is passed, we're processing only one dir
+	ddir="."
 	if test -n "$dir"; then
-		ddir="$dir/"
-		sql_dir="AND history.dirname LIKE './$ddir%'"
+		ddir="./$dir"
+		sql_dir="AND history.dirname LIKE './$dir/%'"
 	fi
 
 	# sed expression to convert `find` output into SQL query which imports
@@ -78,10 +79,10 @@ compare()
 	# prints nothing, but that's unlikely to happen IRL
 	sed="s/'/''/g        # duplicate single quotes
 		1i BEGIN TRANSACTION;
-		1i CREATE TEMPORARY TABLE fs (inode INTEGER, dirname TEXT, filename TEXT, freq INTEGER);
-		s_^([0-9]*) (.*/)([^/]*)_	\\
-			INSERT INTO fs (inode, dirname, filename)	\\
-			VALUES ('\\1', '\\2', '\\3');_
+		1i CREATE TEMPORARY TABLE fs (inode INTEGER, type TEXT, dirname TEXT, filename TEXT, freq INTEGER);
+		s_^([0-9]*) (.) (.*/)([^/]*)/?_	\\
+			INSERT INTO fs (inode, type, dirname, filename)	\\
+			VALUES ('\\1', '\\2', '\\3', '\\4');_
 		\$a END TRANSACTION;"
 
 	# SQL expression to run after above import is complete
@@ -106,9 +107,10 @@ compare()
 		-- performance reasons and to ensure that long-deleted files do
 		-- not affect the result in case of inode reuse
 		CREATE TEMPORARY TABLE new_files AS
-			SELECT fs.inode, fs.dirname, fs.filename, '$BACKUP_TIME', '$BACKUP_TIME_NOW', 0
+			SELECT fs.inode, fs.type, fs.dirname, fs.filename, '$BACKUP_TIME', '$BACKUP_TIME_NOW', 0
 			FROM fs LEFT JOIN history INDEXED BY history_update
 			ON  fs.inode = history.inode
+			AND fs.type = history.type
 			AND fs.dirname = history.dirname
 			AND fs.filename = history.filename
 			AND history.freq = 0 -- to make history INDEXED BY history_update
@@ -122,9 +124,9 @@ compare()
 		-- and so we skip entries in 'history' table which correspond to
 		-- files deleted long time ago.
 		CREATE TEMPORARY TABLE old_files AS
-			SELECT history.inode, history.dirname, history.filename, history.created, '$BACKUP_TIME', 0
+			SELECT history.inode, history.type, history.dirname, history.filename, history.created, '$BACKUP_TIME', 0
 			FROM history INDEXED BY history_update LEFT JOIN fs
-			USING (inode, dirname, filename)
+			USING (inode, type, dirname, filename)
 			WHERE fs.inode IS NULL
 			   AND history.freq = 0 -- to make history INDEXED BY history_update
 			   $sql_dir;
@@ -137,7 +139,7 @@ compare()
 		-- changes 'deleted' date - sets it to current. 'freq' is
 		-- updated on next step - so we could use 'UNIQUE INDEX WHERE
 		-- freq=0' now.
-		INSERT OR REPLACE INTO history (inode, dirname, filename, created, deleted, freq) SELECT * FROM old_files;
+		INSERT OR REPLACE INTO history (inode, type, dirname, filename, created, deleted, freq) SELECT * FROM old_files;
 		-- And now we update 'freq'.
 		UPDATE history SET freq = CASE
 				WHEN strftime('%Y-%m', created,        '-1 second') !=
@@ -161,16 +163,20 @@ compare()
 		WHERE freq = 0
 		  AND deleted = '$BACKUP_TIME';
 		-- Now when 'freq' is changed, we can add entries abot new files
-		INSERT OR REPLACE INTO history (inode, dirname, filename, created, deleted, freq) SELECT * FROM new_files;
+		INSERT OR REPLACE INTO history (inode, type, dirname, filename, created, deleted, freq) SELECT * FROM new_files;
 		PRAGMA optimize;
 		-- STEP 3: Print out lists of new and deleted files.
-		select 'first line';
+		SELECT 'first line';
 		-- List of new files
-		select dirname || filename from new_files;
-		select 'separator';
+		SELECT dirname || filename
+		FROM new_files
+		WHERE type != 'd';
+		SELECT 'separator';
 		-- List of old files
 		-- Note that we print with partial filename in data dir
-		SELECT dirname || filename || '/' || created FROM old_files;
+		SELECT dirname || filename || '/' || created
+		FROM old_files
+		WHERE type != 'd';
 		"
 
 	# Shell command to operate on new files:
@@ -199,7 +205,8 @@ compare()
 	sed '1,/^separator$/d' "$BACKUP_FIFO.old" | tr '\n' '\0' | xargs -r -0 sh -c "$cmd_old" x &
 
 	# Common pipeline
-	/usr/bin/find "$BACKUP_CURRENT/$dir" $BACKUP_FIND_FILTER \( -type f -o -type l \) -printf "%i ./$ddir%P\\n" | ( sed -r "$sed"; echo "$sql" ) | $SQLITE | tee "$BACKUP_FIFO.new" >"$BACKUP_FIFO.old"
+	( cd "$BACKUP_CURRENT"; /usr/bin/find "$ddir" $BACKUP_FIND_FILTER -printf '%i %y %h/%f\n' ) |\
+	( sed -r "$sed"; echo "$sql" ) | $SQLITE | tee "$BACKUP_FIFO.new" >"$BACKUP_FIFO.old"
 
 	# wait for background jobs to finish
 	wait

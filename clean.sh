@@ -67,7 +67,12 @@ cmd="	echo '.timeout 10000'
 		test \"\$(df -PB1 '$BACKUP_MAIN' | awk 'FNR==2{print \$4}')\" -lt $FREE_SPACE_NEEDED || break
 		filename=\"\${1%%|*}\"
 		rowid=\"\${1##*|}\"
-		rm -f \"$BACKUP_MAIN/\$filename\"*
+		# Note: below command will fail for directories for two reasons:
+		# 1. because '\$filename' has a creation date in it, and this is
+		# never a case for directories
+		# 2. because 'rm' command doesn't have '-r' argument, so it
+		# won't delete any directories, even if they matched.
+		rm -f \"$BACKUP_MAIN/\$filename\"* 2>/dev/null
 		echo \"DELETE FROM history WHERE rowid='\$rowid';\"
 		shift
 	done
