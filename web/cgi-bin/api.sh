@@ -26,7 +26,7 @@ if test "$QUERY_STRING" = "|init"; then
 	echo "HTTP/1.0 200 OK"
 	echo "Cache-Control: max-age=600"
 	echo
-	# TODO: create index on dirname in background
+	$SQLITE "CREATE INDEX IF NOT EXISTS api ON history(dirname);"
 	echo .
 	exit 0
 fi
@@ -77,8 +77,6 @@ case "$request" in
 		echo "HTTP/1.0 200 OK"
 		echo "Cache-Control: max-age=600"
 		echo
-		# TODO: create dirname index for this, since it gets called on
-		# every dir open
 		$SQLITE "SELECT filename, type, created || '$BACKUP_TIME_SEP' || deleted
 			FROM history
 			WHERE dirname = '$dir'
@@ -92,26 +90,24 @@ case "$request" in
 		echo "Cache-Control: max-age=600"
 		# echo "Content-Encoding: gzip"
 		echo
-		# TODO: create dirname index for this, since it gets called on
-		# every dir open
 		$SQLITE "PRAGMA case_sensitive_like = ON;
-		ATTACH DATABASE ':memory:' AS mem;
-		CREATE TABLE mem.api AS
+		CREATE TEMP TABLE api AS
 		SELECT created, deleted,
 			CASE
-				WHEN freq >= $BACKUP_MAX_FREQ THEN freq
+				WHEN freq <= $BACKUP_MAX_FREQ THEN freq
 				ELSE 43800 -- every minute
 			END AS freq
 		FROM history
-		WHERE dirname = '$dir'
-		  AND freq != 0;
+		WHERE dirname = '$dir';
+		  -- AND freq != 0; -- *why*?
 		SELECT datetime(created) FROM api
 		UNION
-		SELECT datetime(deleted) FROM api;
+		SELECT datetime(deleted) FROM api
+		WHERE freq != 0;
 		SELECT '===';
 		SELECT freq, datetime(MIN(deleted))
 			FROM api
-			-- WHERE freq != 0 -- already covered above
+			WHERE freq != 0
 			GROUP BY freq;" # | gzip
 	;;
 	(tar)
@@ -122,7 +118,7 @@ case "$request" in
 		echo "Cache-Control: max-age=3600"
 		echo "Content-Disposition: attachment; filename=\"$(basename "$filename").tar\""
 		# https://lists.gnu.org/archive/html/bug-tar/2007-01/msg00013.html
-		~/git/backup3/show.sh "$date" "$dir" "$BACKUP_SHOW"
+		../../show.sh "$date" "$dir" "$BACKUP_SHOW"
 		echo -n "Content-Length: "
 		/bin/tar --create --ignore-failed-read --one-file-system --preserve-permissions --sparse -C "$BACKUP_SHOW/$dir/.." "$filename" --totals --file=/dev/null 2>&1 | sed '/Total bytes written/!d;s/.*: \([0-9]*\) (.*/\1/'
 		echo

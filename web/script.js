@@ -73,10 +73,14 @@ function sortedInsert(array, value) {
 	}
 }
 
+pad=(n)=>(n<10)?'0'+n:n;
+date2str=(day)=>day.getFullYear()+'-'+pad(day.getMonth()+1)+'-'+pad(day.getDay())+' '+pad(day.getHours())+':'+pad(day.getMinutes())+':'+pad(day.getSeconds());
+
 // helper function for the next one
-fillFreqtimes=(freqtimes, ticks, date, n, inc, weekly)=>{
+fillFreqtimes=(freqtimes, ticks, date, n, inc)=>{
 	// freqtimes and ticks are arrays to be edited;
-	// date is 1-based array of int (year, month, day, hour, minute, second)
+	// ~~~ date is 1-based array of int (year, month, day, hour, minute, second)
+	// date is Date
 	// n is index in that array - what choud be increased
 	// inc is by how much
 	// weekly is a special flag to search for monday first
@@ -86,13 +90,6 @@ fillFreqtimes=(freqtimes, ticks, date, n, inc, weekly)=>{
 	// weekly=true
 	date[2]--; // decrease month since they are 0-based
 	date[n]+=inc; // start with second backup, since first one might be partial
-	if(weekly){
-		while(true){
-			var day=new Date(Date.UTC(date[1],date[2],date[3]));
-			if(day.getDay()==1) break;
-			date[3]++;
-		}
-	}
 	var day=new Date(Date.UTC(date[1],date[2],(n>2)?date[3]:1, (n>3)?date[4]:0,(n>4)?date[5]:0));
 	var now=new Date();
 	var now=new Date(Date.UTC(now.getFullYear(),now.getMonth(),now.getDate(), now.getHours(),now.getMinutes()));
@@ -101,7 +98,8 @@ fillFreqtimes=(freqtimes, ticks, date, n, inc, weekly)=>{
 		// TODO: try modifying a single Date instance instead of creating a new one
 		var day=new Date(Date.UTC(date[1],date[2],(n>2)?date[3]:1, (n>3)?date[4]:0,(n>4)?date[5]:0));
 		if(day>now) break;
-		freqtimes[day.toISOString().slice(0, 19).replace('T',' ')]=1;
+		var a=day.getFullYear()+'-'+pad(day.getMonth()+1)+'-'+pad(day.getDay())+' '+pad(day.getHours())+':'+pad(day.getMinutes())+':'+pad(day.getSeconds());
+		freqtimes[a]=1;
 		date[n]+=inc;
 	}
 }
@@ -115,53 +113,77 @@ fetchTimeline=async(dir)=>{
 	var idx=data.indexOf('===');
 	var changes=data.slice(0,idx);
 	ticks=[];
-	var freqtimes={}; // all possible times received via 
-	data.slice(idx+1).map(a=>a.split('|')).forEach(a=>{
-		var e=a[1].match(/^([0-9]*)-([0-9]*)-([0-9]*) ([0-9]*):([0-9]*):([0-9]*)$/);
-		var d=e.map(a=>parseInt(a));
-		switch(a[0]){
-			case '1':
-				// add 1st of every month (field 2)
-				fillFreqtimes(freqtimes,ticks,d, 2,1);
-				break;
-			case '5':
-				// add evey 7th day (field 3) starting from Monday
-				fillFreqtimes(freqtimes,ticks,d, 3,7,true);
-				break;
-			case '30':
-				// add evey day (field 3) starting from provided date
-				fillFreqtimes(freqtimes,ticks,d, 3,1);
-				break;
-			case '720':
-				// add evey hour (field 4)
-				fillFreqtimes(freqtimes,ticks,d, 4,1);
-				break;
-			case '8640':
-				// add evey 5th minute (field 5)
-				fillFreqtimes(freqtimes,ticks,d, 5,5);
-				break;
-			default:
-				// add evey minute (field 5)
-				fillFreqtimes(freqtimes,ticks,d, 5,1);
-				break;
-		} // switch
-	});
-	var ft=Object.keys(freqtimes).sort();
-	var j=0;
-	// TODO: check that we're still in this dir
 	timeline=[];
-	for(var i=0;i<ft.length;i++){
-		if(changes[j]>ft[i]){
-			continue;
+	var freqtimes={}; // all possible times received via 
+	var freqs=data.slice(idx+1).map(a=>a.split('|'));
+	var prop={'1':'Month', '5':'Date', '30':'Date','720':'Hours','8640':'Minutes','43800':'Minutes'};
+	var step={'1':1,       '5':7,      '30':1,     '720':1,      '8640':5,        '43800':1};
+	for(var i=0; i<freqs.length; i++) {
+		var d=new Date(freqs[i][1]);
+		// Now we need to rewind `d` to be _next_ good day. For example,
+		// if `d` is Jan 12th, and freq==1 (monthly), wee need to find
+		// Feb 1st. However, if `d` is Jan 1st - we need to find Feb
+		// 1st, too - because "oldest backup might be incomplete". For
+		// this, we first find matching day by rewinding backwards (set
+		// Jan 1st both for Jan 12th and Jan 1st - that's trivial - just
+		// `d.setDate(1)`), and then move forward to next month
+		// (`d.setMonth(d.getMonth()+1)`).
+		// Part 1: rewinding backwards
+		switch(freqs[i][0]){
+			// note that this switch is without breaks, so following
+			// commands are executed for all preceding cases
+			case '1': //monthly
+				d.setDate(1);
+			case '5': //weekly
+			case '30': //daily
+				d.setHours(0);
+			case '720': //hourly
+				d.setMinutes(0);
+			case '8640': //5-minutes
+			default: //every minute
+				d.setSeconds(0);
+				d.setMilliseconds(0);
+		} // switch
+		if(freqs[i][0]=='5'){
+			if(d.getDay()>1){
+				d.setDate(d.getDate()-d.getDay()+1);
+			} else if(d.getDay()==0){
+				d.setDate(d.getDate()-7+1);
+			}
 		}
-		timeline.push(ft[i]);
-		while(j<changes.length && changes[j]<=ft[i]){
-			j++;
+		if(freqs[i][0]=='8640'){
+			d.setMinutes(d.getMinutes()-d.getMinutes()%5);
 		}
-		if(j==changes.length){
-			break;
+		// Part 2: Move 1 step forward
+		d['set'+prop[freqs[i][0]]](d['get'+prop[freqs[i][0]]]()+step[freqs[i][0]]);
+		// Explanation of the line above:
+		// freqs[i][0] is current freq
+		// prop[freqs[i][0]] is the property which we're changing ('Month')
+		// step[freqs[i][0]] is by how much (usually 1)
+		// 'set'+prop[freqs[i][0]] is this property setter
+		// So above line is:
+		// d['set'+'Month'](d['get'+'Month']()+1)
+		freqs[i][1]=date2str(d);
+		freqs[i][2]=d;
+	}
+	// freqs is array of [freq, 'date', Date]
+	// Add a "dummy" freq with limiting date for the last freq
+	freqs.push([0,changes[changes.length-1]]);
+	// Now, loop through non-"dummy" freqs and fill result array
+	var j=0;
+	for(var i=0; i<freqs.length-1; i++) {
+		var d=freqs[i][2];
+		ticks.push(date2str(d));
+		while(true){
+			var str_day=date2str(d);
+			if(str_day>=freqs[i+1][1]) break;
+			if(j==changes.length) break;
+			if(changes[j]<=str_day) timeline.push(str_day);
+			while(j<changes.length && changes[j]<=str_day) j++;
+			d['set'+prop[freqs[i][0]]](d['get'+prop[freqs[i][0]]]()+step[freqs[i][0]]);
 		}
 	}
+	// TODO: check that we're still in this dir
 	timeline.push('current');
 	timeline_cache[dir]=timeline;
 	ticks_cache[dir]=ticks;
@@ -271,7 +293,7 @@ window.onhashchange=()=>{
 }
 
 // INIT
-// init();
+api('init');
 window.onhashchange();
 
 

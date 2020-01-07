@@ -207,6 +207,14 @@ Note that you need to have `smbclient` installed for this to work.
 To override default username, user can provide username in password field,
 space-separated before password, like this: `username password`.
 
+### API index
+
+Every time you open WebUI, it creates an 'api' index to speed up further
+requests. It's not needed for anything else, so if you don't use WebUI very
+often, I recommend adding the following command to crontab to run every night:
+
+	$SQLITE "DROP INDEX IF EXISTS api;"
+
 Fun stuff
 ---------
 
