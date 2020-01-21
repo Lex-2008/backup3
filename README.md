@@ -215,12 +215,33 @@ often, I recommend adding the following command to crontab to run every night:
 
 	$SQLITE "DROP INDEX IF EXISTS api;"
 
+Remote database
+---------------
+
+If you're running this script on the machine which doesn't have sqlite3, but
+which has (network) access to the machine which does have both sqlite3 and
+busybox - you can access the database via network. For this, just run sqlite3 as
+a server, like this:
+
+	busybox nc -lk -p 24692 -e sqlite3 backup.db
+
+Where 24692 is your favorite port number, and backup.db is the file to be used.
+Check `busybox nc --help` for proper usage, it might be `-ll` or `-lk` in
+different versions.
+
+And set SQLITE variable to access it remotely like this:
+
+	export SQLITE="busybox nc 192.168.100.145 24692"
+
+Where 24692 is the same port number, and 192.168.100.145 is address of the
+machine with SQLite "server".
+
 Fun stuff
 ---------
 
 ### Getting total number of rows in database
 
-	sqlite3 $BACKUP_DB 'SELECT count(*) FROM history;'
+	$SQLITE 'SELECT count(*) FROM history;'
 
 ### Checking disk space used by each dir
 
@@ -239,13 +260,13 @@ Fun stuff
 ### Getting number of files
 
 	# In current backup
-	sqlite3 $BACKUP_DB 'SELECT CASE instr(dirname, "/") WHEN 0 THEN dirname ELSE substr(dirname, 1, instr(dirname, "/")-1) END AS root, count(*) FROM history WHERE freq=0 GROUP BY root LIMIT 10;' | column -tns'|'
+	$SQLITE 'SELECT CASE instr(dirname, "/") WHEN 0 THEN dirname ELSE substr(dirname, 1, instr(dirname, "/")-1) END AS root, count(*) FROM history WHERE freq=0 GROUP BY root LIMIT 10;' | column -tns'|'
 
 	# Deleted
-	sqlite3 $BACKUP_DB 'SELECT CASE instr(dirname, "/") WHEN 0 THEN dirname ELSE substr(dirname, 1, instr(dirname, "/")-1) END AS root, count(*) FROM history WHERE freq!=0 GROUP BY root LIMIT 10;' | column -tns'|'
+	$SQLITE 'SELECT CASE instr(dirname, "/") WHEN 0 THEN dirname ELSE substr(dirname, 1, instr(dirname, "/")-1) END AS root, count(*) FROM history WHERE freq!=0 GROUP BY root LIMIT 10;' | column -tns'|'
 
 	# Total
-	sqlite3 $BACKUP_DB 'SELECT CASE instr(dirname, "/") WHEN 0 THEN dirname ELSE substr(dirname, 1, instr(dirname, "/")-1) END AS root, count(*) FROM history GROUP BY root LIMIT 10;' | column -tns'|'
+	$SQLITE 'SELECT CASE instr(dirname, "/") WHEN 0 THEN dirname ELSE substr(dirname, 1, instr(dirname, "/")-1) END AS root, count(*) FROM history GROUP BY root LIMIT 10;' | column -tns'|'
 
 Note that `-n` argument for `column` command is a non-standard Debian extension
 
@@ -261,11 +282,11 @@ stackexchange answer):
 
 ### Getting most frequently changed files
 
-	sqlite3 $BACKUP_DB "SELECT dirname, filename, count(*) AS num FROM history GROUP BY dirname, filename ORDER BY num DESC LIMIT 10;"
+	$SQLITE "SELECT dirname, filename, count(*) AS num FROM history GROUP BY dirname, filename ORDER BY num DESC LIMIT 10;"
 
 ### Getting latest file in each of "freq" group
 
-	sqlite3 $BACKUP_DB "SELECT freq, MIN(deleted) FROM history WHERE freq != 0 GROUP BY freq;"
+	$SQLITE "SELECT freq, MIN(deleted) FROM history WHERE freq != 0 GROUP BY freq;"
 
 Messing with db
 ---------------
@@ -290,7 +311,7 @@ to backup (like caches), you can delete them - both from filesystem, like this:
 
 and from database, like this:
 
-	sqlite3 $BACKUP_DB "DELETE FROM history WHERE dirname LIKE 'home/.cache%'"
+	$SQLITE "DELETE FROM history WHERE dirname LIKE 'home/.cache%'"
 
 Or run only the first command, followed by `check.sh --fix`. Remember to exclude
 them from the rsync operation - otherwise they will appear in backup again!

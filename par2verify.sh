@@ -22,8 +22,7 @@ test -z "$BACKUP_TIME_SEP" && BACKUP_TIME_SEP="~" # must be regexp-safe
 test -z "$BACKUP_TIME_NOW" && BACKUP_TIME_NOW=now # must be 'now' or valid date in future
 test -z "$BACKUP_PAR2_CPULIMIT" && BACKUP_PAR2_CPULIMIT=0 # limit CPU usage by par2 process
 test -z "$BACKUP_PAR2_LOG" && BACKUP_PAR2_LOG=$BACKUP_ROOT/par2.log
-
-SQLITE="sqlite3 $BACKUP_DB"
+test -z "$SQLITE"         && SQLITE="sqlite3 $BACKUP_DB"
 
 cond2="AND created<strftime('%Y-%m', 'now')"
 if test ! -z "$1"; then
@@ -107,4 +106,4 @@ cmd="	while test \$# -ge 1; do
 	"
 
 export LC_ALL=POSIX
-$SQLITE "$sql" | tr '\n' '\0' | xargs -0 sh -c "$cmd" x
+echo "$sql" | $SQLITE | tr '\n' '\0' | xargs -0 sh -c "$cmd" x

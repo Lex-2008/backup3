@@ -8,12 +8,14 @@ Use pipes, like this:
 			shift
 		done"
 
-	$SQLITE "$sql" | tr '\n' '\0' | xargs -0 sh -c "$cmd" x | $SQLITE
+	echo "$sql" | $SQLITE | tr '\n' '\0' | xargs -0 sh -c "$cmd" x | $SQLITE
 
 Note that sqlite doesn't support null-separated lines, so we have to use `tr`.
 
 Note the busybox `sh` syntax: `-c 'SCRIPT' [ARG0 [ARGS]` hence "x" as ARG0
 
+Note that some implementations of $SQLITE don't support receiving sql expression
+as an argument (most notably, "remote SQLite"), hence please avoid using it.
 
 To select filenames:
 

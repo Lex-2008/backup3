@@ -18,14 +18,13 @@ test -z "$BACKUP_TIMEOUT" && BACKUP_TIMEOUT="3600" # 1h
 test -z "$BACKUP_TIME_SEP" && BACKUP_TIME_SEP="~" # must be regexp-safe
 test -z "$BACKUP_TIME_NOW" && BACKUP_TIME_NOW=now # must be 'now' or valid date in future
 test -z "$BACKUP_MAX_FREQ" && BACKUP_MAX_FREQ=8640
+test -z "$SQLITE"         && SQLITE="sqlite3 $BACKUP_DB"
 
 # 2592000 is number of seconds / month
 # BACKUP_MAX_FREQ is number of events / month
 # hence 2592000/BACKUP_MAX_FREQ is number of seconds / event
 # usually 300 seconds for BACKUP_MAX_FREQ=8640 (5 minutes)
 BACKUP_MAX_FREQ_SEC="$(echo "2592000 $BACKUP_MAX_FREQ / p" | dc)"
-
-SQLITE="sqlite3 $BACKUP_DB"
 
 exec 200>"$BACKUP_FLOCK"
 if test -z "$BACKUP_WAIT_FLOCK"; then

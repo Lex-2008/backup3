@@ -15,11 +15,10 @@ test -z "$BACKUP_DB"      && BACKUP_DB=$BACKUP_ROOT/backup.db
 test -z "$BACKUP_TIME_SEP" && BACKUP_TIME_SEP="~"
 test -z "$BACKUP_TIME_NOW" && BACKUP_TIME_NOW=now
 test -z "$BACKUP_MAX_FREQ" && BACKUP_MAX_FREQ=8640
+test -z "$SQLITE"         && SQLITE="sqlite3 $BACKUP_DB"
 
 # see backup1.sh for explanation
 BACKUP_MAX_FREQ_SEC="$(echo "2592000 $BACKUP_MAX_FREQ / p" | dc)"
-
-SQLITE="sqlite3 $BACKUP_DB"
 
 # wait for lock to be available
 exec 200>"$BACKUP_FLOCK"
@@ -52,12 +51,12 @@ db2current ()
 		done
 		echo 'END TRANSACTION;'
 		"
-	$SQLITE "SELECT dirname || filename,
+	echo "SELECT dirname || filename,
 			rowid
 		FROM history
 		WHERE freq = 0
 		  AND type != 'd'
-		ORDER BY dirname;" | tr '\n' '\0' | xargs -0 sh -c "$cmd" x | $SQLITE
+		ORDER BY dirname;" | $SQLITE | tr '\n' '\0' | xargs -0 sh -c "$cmd" x | $SQLITE
 }
 
 db2current_dirs ()
@@ -75,12 +74,12 @@ db2current_dirs ()
 		done
 		echo 'END TRANSACTION;'
 		"
-	$SQLITE "SELECT dirname || filename,
+	echo "SELECT dirname || filename,
 			rowid
 		FROM history
 		WHERE freq = 0
 		  AND type = 'd'
-		ORDER BY dirname;" | tr '\n' '\0' | xargs -0 sh -c "$cmd" x | $SQLITE
+		ORDER BY dirname;" | $SQLITE | tr '\n' '\0' | xargs -0 sh -c "$cmd" x | $SQLITE
 }
 
 db2old ()
@@ -98,11 +97,11 @@ db2old ()
 		done
 		echo 'END TRANSACTION;'
 		"
-	$SQLITE "SELECT dirname || filename || '/' || created || '$BACKUP_TIME_SEP' || deleted,
+	echo "SELECT dirname || filename || '/' || created || '$BACKUP_TIME_SEP' || deleted,
 			rowid
 		FROM history
 		WHERE type != 'd'
-		ORDER BY dirname;" | tr '\n' '\0' | xargs -0 sh -c "$cmd" x | $SQLITE
+		ORDER BY dirname;" | $SQLITE | tr '\n' '\0' | xargs -0 sh -c "$cmd" x | $SQLITE
 }
 
 current2db ()
@@ -239,7 +238,7 @@ db_overlaps ()
 		done
 		echo 'END TRANSACTION;'
 		"
-	$SQLITE "SELECT
+	echo "SELECT
 			a.dirname || a.filename || '/' || a.created || '$BACKUP_TIME_SEP' || a.deleted,
 			a.dirname || a.filename || '/' || a.created || '$BACKUP_TIME_SEP' || b.created,
 			'UPDATE history SET deleted = \"' || b.created || '\" WHERE rowid = \"' || a.rowid || '\";'
@@ -250,7 +249,7 @@ db_overlaps ()
 			AND a.created < b.deleted
 			AND b.created < a.deleted
 		GROUP BY a.dirname, a.filename, a.created;
-		" | tr '\n' '\0' | xargs -0 sh -c "$cmd" x | $SQLITE
+		" | $SQLITE | tr '\n' '\0' | xargs -0 sh -c "$cmd" x | $SQLITE
 }
 
 db_order ()
@@ -261,9 +260,9 @@ db_order ()
 			shift
 		done
 		"
-	$SQLITE "SELECT dirname || filename || '/' || created || '$BACKUP_TIME_SEP' || deleted
+	echo "SELECT dirname || filename || '/' || created || '$BACKUP_TIME_SEP' || deleted
 		FROM history
-		WHERE created >= deleted;" | tr '\n' '\0' | xargs -0 sh -c "$cmd" x >check.db_order
+		WHERE created >= deleted;" | $SQLITE | tr '\n' '\0' | xargs -0 sh -c "$cmd" x >check.db_order
 }
 
 db_dups_created ()
@@ -273,7 +272,7 @@ db_dups_created ()
 	else
 		operation="SELECT *"
 	fi
-	$SQLITE "$operation FROM history
+	echo "$operation FROM history
 		WHERE EXISTS (
 			SELECT *
 			FROM history AS b
@@ -289,12 +288,12 @@ db_dups_created ()
 					AND history.rowid < b.rowid
 				)
 			)
-		);" >check.db_dups_created
+		); " | $SQLITE >check.db_dups_created
 }
 
 db_dups_freq0 ()
 {
-	$SQLITE "SELECT a.*, b.created
+	echo "SELECT a.*, b.created
 		FROM history AS a,
 		history AS b
 		WHERE a.freq = 0
@@ -302,7 +301,7 @@ db_dups_freq0 ()
 			AND a.dirname = b.dirname
 			AND a.filename = b.filename
 			AND b.freq = 0
-			;" >check.db_dups_freq0
+			;" | $SQLITE >check.db_dups_freq0
 }
 
 db_freq ()
@@ -312,7 +311,7 @@ db_freq ()
 	else
 		query="SELECT * FROM history WHERE freq != CASE"
 	fi
-	$SQLITE "$query
+	echo "$query
 		WHEN deleted = '$BACKUP_TIME_NOW'
 		     THEN 0 -- not deleted yet
 		WHEN strftime('%Y-%m', created, '-1 second') !=
@@ -332,7 +331,7 @@ db_freq ()
 		     THEN $BACKUP_MAX_FREQ -- crosses BACKUP_MAX_FREQ boundary (usually 5 minutes)
 		ELSE 2592000 / (strftime('%s', deleted) - strftime('%s', created))
 		     -- 2592000 is number of seconds per month
-	END;"
+	END;" | $SQLITE
 }
 
 check () {
@@ -349,7 +348,7 @@ if test -e check.sh; then
 fi
 rm check.*
 
-$SQLITE "BEGIN TRANSACTION; DROP INDEX IF EXISTS history_update; CREATE INDEX IF NOT EXISTS check_tmp ON history(dirname, filename, created);ANALYZE; END TRANSACTION;"
+echo "BEGIN TRANSACTION; DROP INDEX IF EXISTS history_update; CREATE INDEX IF NOT EXISTS check_tmp ON history(dirname, filename, created);ANALYZE; END TRANSACTION;" | $SQLITE
 
 # Tests that might add new files in current
 check old2current
@@ -380,6 +379,6 @@ check current2old
 # This test should never fail
 check db_dups_freq0
 
-$SQLITE "DROP INDEX IF EXISTS check_tmp;CREATE UNIQUE INDEX history_update ON history(dirname, filename) WHERE freq = 0;VACUUM;"
+echo "DROP INDEX IF EXISTS check_tmp;CREATE UNIQUE INDEX history_update ON history(dirname, filename) WHERE freq = 0;VACUUM;" | $SQLITE
 
 wc -l check.*

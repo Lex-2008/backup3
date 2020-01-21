@@ -14,13 +14,9 @@ test -z "$BACKUP_ROOT"    && exit 2
 test -z "$BACKUP_MAIN"    && BACKUP_MAIN=$BACKUP_ROOT/data
 test -z "$BACKUP_DB"      && BACKUP_DB=$BACKUP_ROOT/backup.db
 test -z "$BACKUP_TIME_SEP" && BACKUP_TIME_SEP="~"
+test -z "$SQLITE"         && SQLITE="sqlite3 $BACKUP_DB"
 
 test -z "$CLEAN_BY_FREQ"  && CLEAN_BY_FREQ="1" # set to 0 to ignore freq when cleaning
-
-SQLITE="sqlite3 $BACKUP_DB"
-
-NL="
-"
 
 case "$2" in
 	( "%" )
@@ -79,4 +75,4 @@ cmd="	echo '.timeout 10000'
 	echo 'END TRANSACTION;'
 	echo 'PRAGMA optimize;'"
 
-$SQLITE "$sql" | tr '\n' '\0' | xargs -0 sh -c "$cmd" x | $SQLITE
+echo "$sql" | $SQLITE | tr '\n' '\0' | xargs -0 sh -c "$cmd" x | $SQLITE

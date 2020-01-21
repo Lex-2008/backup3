@@ -12,12 +12,11 @@ test -z "$BACKUP_ROOT"    && exit 2
 test -z "$BACKUP_MAIN"    && BACKUP_MAIN=$BACKUP_ROOT/data
 test -z "$BACKUP_DB"      && BACKUP_DB=$BACKUP_ROOT/backup.db
 test -z "$BACKUP_TIME_SEP" && BACKUP_TIME_SEP="~"
+test -z "$SQLITE"         && SQLITE="sqlite3 $BACKUP_DB"
 
 SHOW_DATE="$1"
 SHOW_DIR="$2"
 SHOW_IN="$3"
-
-SQLITE="sqlite3 $BACKUP_DB"
 
 rm -rf "$SHOW_IN"
 
@@ -40,4 +39,4 @@ cmd="
 	done
 "
 
-$SQLITE "$sql" | tr '\n' '\0' | xargs -0 sh -c "$cmd" x
+echo "$sql" | $SQLITE | tr '\n' '\0' | xargs -0 sh -c "$cmd" x

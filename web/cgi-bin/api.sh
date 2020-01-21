@@ -10,12 +10,9 @@ test -z "$BACKUP_DB"      && BACKUP_DB=$BACKUP_ROOT/backup.db
 test -z "$BACKUP_TIME_SEP" && BACKUP_TIME_SEP="~"
 test -z "$BACKUP_TIME_NOW" && BACKUP_TIME_NOW=now
 test -z "$BACKUP_MAX_FREQ" && BACKUP_MAX_FREQ=8640
+test -z "$SQLITE"         && SQLITE="sqlite3 $BACKUP_DB"
 
-SQLITE="sqlite3 $BACKUP_DB"
-
-MODE=simple
-
-# init <<in complex mode, returns list of root dirs
+# init # doesn't return anything, just creates index
 #       ls|dir|date
 # timeline|dir
 #      tar|dir|date
@@ -26,7 +23,7 @@ if test "$QUERY_STRING" = "|init"; then
 	echo "HTTP/1.0 200 OK"
 	echo "Cache-Control: max-age=600"
 	echo
-	$SQLITE "CREATE INDEX IF NOT EXISTS api ON history(dirname);"
+	echo "CREATE INDEX IF NOT EXISTS api ON history(dirname);" | $SQLITE
 	echo .
 	exit 0
 fi
@@ -77,20 +74,20 @@ case "$request" in
 		echo "HTTP/1.0 200 OK"
 		echo "Cache-Control: max-age=600"
 		echo
-		$SQLITE "SELECT filename, type, created || '$BACKUP_TIME_SEP' || deleted
+		echo "SELECT filename, type, created || '$BACKUP_TIME_SEP' || deleted
 			FROM history
 			WHERE dirname = '$dir'
 			  AND created <= '$date'
 			  AND deleted > '$date'
 			  AND filename!='.'
-			  ORDER BY type, filename;"
+			  ORDER BY type, filename;" | $SQLITE
 	;;
 	(timeline)
 		echo "HTTP/1.0 200 OK"
 		echo "Cache-Control: max-age=600"
 		# echo "Content-Encoding: gzip"
 		echo
-		$SQLITE "PRAGMA case_sensitive_like = ON;
+		echo "PRAGMA case_sensitive_like = ON;
 		CREATE TEMP TABLE api AS
 		SELECT created, deleted,
 			CASE
@@ -108,7 +105,7 @@ case "$request" in
 		SELECT freq, datetime(MIN(deleted))
 			FROM api
 			WHERE freq != 0
-			GROUP BY freq;" # | gzip
+			GROUP BY freq;" | $SQLITE # | gzip
 	;;
 	(tar)
 		export BACKUP_ROOT BACKUP_MAIN BACKUP_DB
@@ -141,10 +138,10 @@ case "$request" in
 		echo
 		echo "$BACKUP_TIME_SEP"
 		echo "$BACKUP_TIME_NOW"
-		$SQLITE "SELECT created, deleted, freq
+		echo "SELECT created, deleted, freq
 			FROM history
 			WHERE dirname = '$dir'
-			  AND filename = '$file';"
+			  AND filename = '$file';" | $SQLITE
 	;;
 	(*)
 		echo "HTTP/1.0 501 Not Implemented"

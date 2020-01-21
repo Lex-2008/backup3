@@ -25,8 +25,7 @@ test -z "$BACKUP_TIME_SEP" && BACKUP_TIME_SEP="~" # must be regexp-safe
 test -z "$BACKUP_TIME_NOW" && BACKUP_TIME_NOW=now # must be 'now' or valid date in future
 test -z "$BACKUP_PAR2_SIZELIMIT" && BACKUP_PAR2_SIZELIMIT=300000 # minimum file size to create *.par2 archive, smaller files are copied to *.bak ones as-is
 test -z "$BACKUP_PAR2_CPULIMIT" && BACKUP_PAR2_CPULIMIT=0 # limit CPU usage by par2 process
-
-SQLITE="sqlite3 $BACKUP_DB"
+test -z "$SQLITE"         && SQLITE="sqlite3 $BACKUP_DB"
 
 cond2="AND created<strftime('%Y-%m', 'now')"
 if test ! -z "$1"; then
@@ -130,4 +129,4 @@ cmd="getfn() {
 	"
 
 export LC_ALL=POSIX
-$SQLITE "$sql" | tr '\n' '\0' | xargs -0 sh -c "$cmd" x
+echo "$sql" | $SQLITE | tr '\n' '\0' | xargs -0 sh -c "$cmd" x

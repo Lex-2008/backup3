@@ -11,11 +11,10 @@ test -z "$BACKUP_DB"      && BACKUP_DB=$BACKUP_ROOT/backup.db
 test -z "$BACKUP_TIME_SEP" && BACKUP_TIME_SEP="~" # must NOT be /
 test -z "$BACKUP_TIME_NOW" && BACKUP_TIME_NOW=now
 test -z "$BACKUP_MAX_FREQ" && BACKUP_MAX_FREQ=8640
+test -z "$SQLITE"         && SQLITE="sqlite3 $BACKUP_DB"
 
 # see backup1.sh for explanation
 BACKUP_MAX_FREQ_SEC="$(echo "2592000 $BACKUP_MAX_FREQ / p" | dc)"
-
-SQLITE="sqlite3 $BACKUP_DB"
 
 # exit if there is another copy of this script running
 exec 200>"$BACKUP_FLOCK"
@@ -40,9 +39,9 @@ echo "2: fill files"
 	\$a END TRANSACTION;" | $SQLITE
 
 echo "3: fill dirs"
-$SQLITE "SELECT dirname, MIN(created), MAX(deleted)
+echo "SELECT dirname, MIN(created), MAX(deleted)
 		FROM history
-		GROUP BY dirname;" | sed -r "
+		GROUP BY dirname;" | $SQLITE | sed -r "
 	1i .timeout 10000
 	1i BEGIN TRANSACTION;
 	s/'/''/g        # duplicate single quotes
@@ -53,7 +52,7 @@ $SQLITE "SELECT dirname, MIN(created), MAX(deleted)
 	\$a END TRANSACTION;" | $SQLITE
 
 echo "4: update freq"
-$SQLITE "UPDATE history SET freq = CASE
+echo "UPDATE history SET freq = CASE
 		WHEN deleted = '$BACKUP_TIME_NOW'
 		     THEN 0 -- not deleted yet
 		WHEN strftime('%Y-%m', created, '-1 second') !=
@@ -73,7 +72,7 @@ $SQLITE "UPDATE history SET freq = CASE
 		     THEN $BACKUP_MAX_FREQ -- crosses BACKUP_MAX_FREQ boundary (usually 5 minutes)
 		ELSE 2592000 / (strftime('%s', deleted) - strftime('%s', created))
 		     -- 2592000 is number of seconds per month
-	END;"
+	END;" | $SQLITE
 
 echo "5: index"
 ./init.sh --notable
@@ -95,7 +94,7 @@ if test "$1" = "--current"; then
 fi
 
 echo "6: update dir inodes"
-min_date="$($SQLITE 'SELECT min(created) FROM history;')"
+min_date="$(echo 'SELECT min(created) FROM history;' | $SQLITE)"
 echo "min_date=$min_date"
 ( cd "$BACKUP_CURRENT"; /usr/bin/find . $BACKUP_FIND_FILTER -type d -printf '%i %h/%f\n' ) | sed -r "
 	1i .timeout 10000
