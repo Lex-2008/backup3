@@ -16,10 +16,48 @@ test -z "$SQLITE"         && SQLITE="sqlite3 $BACKUP_DB"
 # see backup1.sh for explanation
 BACKUP_MAX_FREQ_SEC="$(echo "2592000 $BACKUP_MAX_FREQ / p" | dc)"
 
-# exit if there is another copy of this script running
-exec 200>"$BACKUP_FLOCK"
-flock -n 200 || exit 200
+# `find` replacement, which scans a given dir and for each object found it prints:
+# * its inode number
+# * its type ('f' for file, 'd' for dir, 's' for others)
+# * its name
+# all in one line
+# Arguments:
+# * dir to `cd` prior to `find`
+# * dirname and other filters to pass to `find`
+my_find()
+{
+	cd "$1"
+	shift
+	if test -f /usr/bin/find && /usr/bin/find --version 2>&1 | grep -q GNU; then
+		/usr/bin/find "$@" -printf '%i %y %h/%f\n'
+	else
+		sed='s/^([0-9]*) regular( empty)? file /\1 f /
+		     s/^([0-9]*) directory /\1 d /
+		     t
+		     s/^([0-9]*) [^.]* /\1 s /'
+		find "$@" | xargs stat -c '%i %F %n' | sed -r '$sed'
+	fi
+	cd -> /dev/null
+}
 
+# check if there is another copy of this script running
+lock_available()
+{
+	file="$1"
+	test ! -f "$file" && return 0
+	pid="$(cat "$file")"
+	test ! -d "/proc/$pid" && { echo "process $pid does not exist"; rm "$file"; return 0; }
+	test ! -f "/proc/$pid/fd/200" && { echo "process $pid does not have FD 200"; rm "$file"; return 0; }
+	test ! "$(stat -c %N /proc/$pid/fd/200)" == "/proc/$pid/fd/200 -> $file" && { echo "process $pid has FD 200 not pointing to $file"; rm "$file"; return 0; }
+	return 1
+}
+if ! lock_available; then
+	test -z "$BACKUP_WAIT_FLOCK" && exit 200
+	while ! lock_available; do sleep 1; done
+fi
+# acquire lock
+exec 200>"$BACKUP_FLOCK"
+echo "$$">&200
 
 echo "### DATABASE ###"
 
@@ -29,7 +67,7 @@ echo "1: create"
 ./init.sh --noindex
 
 echo "2: fill files"
-/usr/bin/find "$BACKUP_MAIN" $BACKUP_FIND_FILTER -not -type d -name "*$BACKUP_TIME_SEP*" -printf '%i %y ./%P\n' | sed -r "
+my_find "$BACKUP_MAIN" . $BACKUP_FIND_FILTER -not -type d -name "*$BACKUP_TIME_SEP*" | sed -r "
 	1i .timeout 10000
 	1i BEGIN TRANSACTION;
 	s/'/''/g        # duplicate single quotes
@@ -90,20 +128,25 @@ if test "$1" = "--current"; then
 		shift
 	done"
 
-	/usr/bin/find "$BACKUP_MAIN" $BACKUP_FIND_FILTER \( -type f -o -type l \) -name "*$BACKUP_TIME_SEP$BACKUP_TIME_NOW" -printf '%P\0' | xargs -r -0 sh -c "$cmd" x
+	# note that this uses simple -print0 which is supported both in GNU and busybox find
+	cd "$BACKUP_MAIN"
+	find . $BACKUP_FIND_FILTER -not -type d -name "*$BACKUP_TIME_SEP$BACKUP_TIME_NOW" -print0 | xargs -r -0 sh -c "$cmd" x
+	cd -> /dev/null
 fi
 
 echo "6: update dir inodes"
 min_date="$(echo 'SELECT min(created) FROM history;' | $SQLITE)"
 echo "min_date=$min_date"
-( cd "$BACKUP_CURRENT"; /usr/bin/find . $BACKUP_FIND_FILTER -type d -printf '%i %h/%f\n' ) | sed -r "
+my_find  "$BACKUP_CURRENT" . $BACKUP_FIND_FILTER -type d | sed -r "
 	1i .timeout 10000
 	1i BEGIN TRANSACTION;
 	s/'/''/g        # duplicate single quotes
-	s@^([0-9]*) (.*/)([^/]*)@	\\
+	s@^([0-9]*) . (.*/)([^/]*)@	\\
 		INSERT INTO history (inode, type, dirname, filename, created, deleted, freq) VALUES	\\
 		('\\1', 'd', '\\2', '\\3', '$min_date', 'now', 0)	\\
 		ON CONFLICT(dirname, filename) WHERE freq = 0 DO UPDATE \\
 		SET inode='\\1';@
 	\$a END TRANSACTION;" | $SQLITE
 
+# release the lock
+rm "$BACKUP_FLOCK"

@@ -20,9 +20,48 @@ test -z "$SQLITE"         && SQLITE="sqlite3 $BACKUP_DB"
 # see backup1.sh for explanation
 BACKUP_MAX_FREQ_SEC="$(echo "2592000 $BACKUP_MAX_FREQ / p" | dc)"
 
-# wait for lock to be available
+# `find` replacement, which scans a given dir and for each object found it prints:
+# * its inode number
+# * its type ('f' for file, 'd' for dir, 's' for others)
+# * its name
+# all in one line
+# Arguments:
+# * dir to `cd` prior to `find`
+# * dirname and other filters to pass to `find`
+my_find()
+{
+	cd "$1"
+	shift
+	if test -f /usr/bin/find && /usr/bin/find --version 2>&1 | grep -q GNU; then
+		/usr/bin/find "$@" -printf '%i %y %h/%f\n'
+	else
+		sed='s/^([0-9]*) regular( empty)? file /\1 f /
+		     s/^([0-9]*) directory /\1 d /
+		     t
+		     s/^([0-9]*) [^.]* /\1 s /'
+		find "$@" | xargs stat -c '%i %F %n' | sed -r '$sed'
+	fi
+	cd -> /dev/null
+}
+
+# check if there is another copy of this script running
+lock_available()
+{
+	file="$1"
+	test ! -f "$file" && return 0
+	pid="$(cat "$file")"
+	test ! -d "/proc/$pid" && { echo "process $pid does not exist"; rm "$file"; return 0; }
+	test ! -f "/proc/$pid/fd/200" && { echo "process $pid does not have FD 200"; rm "$file"; return 0; }
+	test ! "$(stat -c %N /proc/$pid/fd/200)" == "/proc/$pid/fd/200 -> $file" && { echo "process $pid has FD 200 not pointing to $file"; rm "$file"; return 0; }
+	return 1
+}
+if ! lock_available; then
+	test -z "$BACKUP_WAIT_FLOCK" && exit 200
+	while ! lock_available; do sleep 1; done
+fi
+# acquire lock
 exec 200>"$BACKUP_FLOCK"
-flock 200 || exit 200
+echo "$$">&200
 
 if test "$1" = '--fix'; then
 	FIX=1
@@ -107,15 +146,29 @@ db2old ()
 current2db ()
 {
 	test -n "$FIX" && echo "current2db: --fix is not supported"
-	/usr/bin/find "$BACKUP_CURRENT" -not -type d -printf '%i ./%P\n' | sed -r "s/'/''/g;s_^([0-9]*) (.*/)([^/]*)_SELECT CASE WHEN EXISTS(SELECT 1 FROM history WHERE inode='\\1' AND dirname='\\2' AND filename='\\3' AND freq=0 AND type != 'd' LIMIT 1) THEN 1 ELSE '\\2\\3' END;_" | $SQLITE | fgrep -v -x 1 >"$BACKUP_ROOT/check.current2db"
+	my_find "$BACKUP_CURRENT" . -not -type d | sed -r "
+	s/'/''/g
+	s_^([0-9]*) . (.*/)([^/]*)_	\\
+	SELECT CASE	\\
+		WHEN EXISTS(	\\
+			SELECT 1	\\
+			FROM history	\\
+			WHERE inode='\\1'	\\
+			AND dirname='\\2'	\\
+			AND filename='\\3'	\\
+			AND freq=0	\\
+			AND type != 'd'	\\
+			LIMIT 1	\\
+		) THEN 1	\\
+		ELSE '\\2\\3' END;_" | $SQLITE | fgrep -v -x 1 >"$BACKUP_ROOT/check.current2db"
 }
 
 current2db_dirs ()
 {
 	test -n "$FIX" && echo "current2db_dirs: --fix is not supported"
-	( cd "$BACKUP_CURRENT"; /usr/bin/find -type d -printf '%i %h/%f\n' ) | sed -r "
+	my_find "$BACKUP_CURRENT" . -type d | sed -r "
 	s/'/''/g
-	s_^([0-9]*) (.*/)([^/]*)_	\\
+	s_^([0-9]*) . (.*/)([^/]*)_	\\
 	SELECT CASE	\\
 		WHEN EXISTS(	\\
 			SELECT 1	\\
@@ -133,10 +186,10 @@ current2db_dirs ()
 old2db ()
 {
 	if test -n "$FIX"; then
-		/usr/bin/find "$BACKUP_MAIN" \( -type f -o -type l \) -name "*$BACKUP_TIME_SEP$BACKUP_TIME_NOW" -printf '%i ./%P\n' | sed -r "
+		my_find "$BACKUP_MAIN" . -not -type d -name "*$BACKUP_TIME_SEP$BACKUP_TIME_NOW" | sed -r "
 		s/'/''/g;
 		1i BEGIN TRANSACTION;
-		s_^([0-9]*) (.*/)([^/]*)/([^/$BACKUP_TIME_SEP]*)$BACKUP_TIME_SEP([^/$BACKUP_TIME_SEP]*)\$_	\\
+		s_^([0-9]*) . (.*/)([^/]*)/([^/$BACKUP_TIME_SEP]*)$BACKUP_TIME_SEP([^/$BACKUP_TIME_SEP]*)\$_	\\
 			INSERT INTO history(inode, dirname, filename, created, deleted, freq)	\\
 			SELECT '\\1', '\\2', '\\3', '\\4', '\\5', 0	\\
 			WHERE NOT EXISTS (	\\
@@ -153,9 +206,9 @@ old2db ()
 		  \$a END TRANSACTION;
 		" | $SQLITE
 	else
-		/usr/bin/find "$BACKUP_MAIN" \( -type f -o -type l \) -name "*$BACKUP_TIME_SEP$BACKUP_TIME_NOW" -printf '%i ./%P\n' | sed -r "
+		my_find "$BACKUP_MAIN" . -not -type d -name "*$BACKUP_TIME_SEP$BACKUP_TIME_NOW" | sed -r "
 		s/'/''/g;
-		s_^([0-9]*) (.*/)([^/]*)/([^/$BACKUP_TIME_SEP]*)$BACKUP_TIME_SEP([^/$BACKUP_TIME_SEP]*)\$_	\\
+		s_^([0-9]*) . (.*/)([^/]*)/([^/$BACKUP_TIME_SEP]*)$BACKUP_TIME_SEP([^/$BACKUP_TIME_SEP]*)\$_	\\
 		SELECT CASE WHEN EXISTS	\\
 		  (SELECT 1	\\
 		   FROM history	\\
@@ -187,7 +240,9 @@ old2current ()
 			fi
 			shift
 		done"
-	/usr/bin/find "$BACKUP_MAIN" -not -type d -name "*$BACKUP_TIME_SEP$BACKUP_TIME_NOW" -printf '%P\0' | xargs -0 sh -c "$cmd" x >"$BACKUP_ROOT/check.old2current"
+	cd "$BACKUP_MAIN"
+	find . -not -type d -name "*$BACKUP_TIME_SEP$BACKUP_TIME_NOW" -print0 | xargs -0 sh -c "$cmd" x >"$BACKUP_ROOT/check.old2current"
+	cd -> /dev/null
 }
 
 current2old ()
@@ -198,7 +253,7 @@ current2old ()
 			ls -i \"$BACKUP_MAIN/\$fullname\" 2>/dev/null | grep -q \"^ *\$inode \" || echo \"\$fullname\"
 			shift
 		done"
-	/usr/bin/find "$BACKUP_CURRENT" -not -type d -printf '%i|%P\0' | xargs -0 sh -c "$cmd" x | (
+	my_find "$BACKUP_CURRENT" . -not -type d | sed -r 's/^([0-9]*) . (.*)/\1|\2/' | tr '\n' '\0' | xargs -0 sh -c "$cmd" x | (
 		if test -n "$FIX"; then
 			cd "$BACKUP_CURRENT"
 			# These files might either be in DB, or not. If they
@@ -382,3 +437,6 @@ check db_dups_freq0
 echo "DROP INDEX IF EXISTS check_tmp;CREATE UNIQUE INDEX history_update ON history(dirname, filename) WHERE freq = 0;VACUUM;" | $SQLITE
 
 wc -l check.*
+
+# release the lock
+rm "$BACKUP_FLOCK"

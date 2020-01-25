@@ -26,14 +26,51 @@ test -z "$SQLITE"         && SQLITE="sqlite3 $BACKUP_DB"
 # usually 300 seconds for BACKUP_MAX_FREQ=8640 (5 minutes)
 BACKUP_MAX_FREQ_SEC="$(echo "2592000 $BACKUP_MAX_FREQ / p" | dc)"
 
-exec 200>"$BACKUP_FLOCK"
-if test -z "$BACKUP_WAIT_FLOCK"; then
-	# exit if there is another copy of this script running
-	flock -n 200 || exit 200
-else
-	# wait until there is no other copy of this script running
-	flock 200
+# `find` replacement, which scans a given dir and for each object found it prints:
+# * its inode number
+# * its type ('f' for file, 'd' for dir, 's' for others)
+# * its name
+# all in one line
+# Arguments:
+# * dir to `cd` prior to `find`
+# * dirname and other filters to pass to `find`
+my_find()
+{
+	cd "$1"
+	shift
+	# echo "==find==" >&2
+	# echo "$@" >&2
+	# echo "==end==" >&2
+	if test -f /usr/bin/find && /usr/bin/find --version 2>&1 | grep -q GNU; then
+		/usr/bin/find "$@" -printf '%i %y %h/%f\n' | tee /tmp/tmp1
+	else
+		sed='s/^([0-9]*) regular( empty)? file /\1 f /
+		     s/^([0-9]*) directory /\1 d /
+		     t
+		     s/^([0-9]*) [^.]* /\1 s /'
+		find "$@" | xargs stat -c '%i %F %n' | sed -r '$sed' | tee /tmp/tmp2
+	fi
+	cd -> /dev/null
+}
+
+# check if there is another copy of this script running
+lock_available()
+{
+	file="$1"
+	test ! -f "$file" && return 0
+	pid="$(cat "$file")"
+	test ! -d "/proc/$pid" && { echo "process $pid does not exist"; rm "$file"; return 0; }
+	test ! -f "/proc/$pid/fd/200" && { echo "process $pid does not have FD 200"; rm "$file"; return 0; }
+	test ! "$(stat -c %N /proc/$pid/fd/200)" == "/proc/$pid/fd/200 -> $file" && { echo "process $pid has FD 200 not pointing to $file"; rm "$file"; return 0; }
+	return 1
+}
+if ! lock_available; then
+	test -z "$BACKUP_WAIT_FLOCK" && exit 200
+	while ! lock_available; do sleep 1; done
 fi
+# acquire lock
+exec 200>"$BACKUP_FLOCK"
+echo "$$">&200
 
 ### RSYNC ###
 
@@ -204,8 +241,7 @@ compare()
 	sed '1,/^separator$/d' "$BACKUP_FIFO.old" | tr '\n' '\0' | xargs -r -0 sh -c "$cmd_old" x &
 
 	# Common pipeline
-	( cd "$BACKUP_CURRENT"; /usr/bin/find "$ddir" $BACKUP_FIND_FILTER -printf '%i %y %h/%f\n' ) |\
-	( sed -r "$sed"; echo "$sql" ) | $SQLITE | tee "$BACKUP_FIFO.new" >"$BACKUP_FIFO.old"
+	my_find  "$BACKUP_CURRENT" "$ddir" $BACKUP_FIND_FILTER | ( sed -r "$sed"; echo "$sql" ) | $SQLITE | tee "$BACKUP_FIFO.new" >"$BACKUP_FIFO.old"
 
 	# wait for background jobs to finish
 	wait
@@ -220,3 +256,6 @@ if command -v run_this >/dev/null; then
 else
 	compare
 fi
+
+# release the lock
+rm "$BACKUP_FLOCK"

@@ -1,7 +1,7 @@
 backup3
 =======
 
-My third _and a half_ attempt at making backups - using ~~bash~~ _busybox_, ~find~ _comm -3_, and SQLite.
+My third _and a half_ attempt at making backups - using ~bash~ _busybox_, ~find~, ~diff~ ~comm -3~, and SQLite.
 
 Background
 ----------
@@ -41,7 +41,7 @@ So it work like this:
 #### How do we compare?
 
 To notice changes in new and deleted files, we can just save list of all files, like this: `find -type f >files.list.new` ~and run `diff` to compare it to previous version~.
-Then new files will appear in diff marked with `>` symbol, and deleted - with `<`.~
+~Then new files will appear in diff marked with `>` symbol, and deleted - with `<`.~
 
 Update: `diff` sometimes gets confused when many lines get changed, and reports not-changed files as both created and deleted.
 ~I've moved to `comm -3` utility since then - when comparing two files, it prefixes lines unique to second file with tab character, and (due to `-3` argument) skips lines which present in both files.~
@@ -49,7 +49,7 @@ Update: `diff` sometimes gets confused when many lines get changed, and reports 
 
 Update 2: To make it possible to work with individual dirs of files in 'current' directory, I've moved to using SQLite for comparing "real" and "stored" filesystem state: output of `find` command is converted by sed to SQL statements to populate new table, which gets `LEFT JOIN`ed with table from previous run, and if we select rows containing `NULL` values in _right_ table - then we get rows which exist _only_ in _left_ table - these are _new_ or _old_ files depending on odred in which we join tables.
 
-To track also changed files, we actually need to record inode number together with filename - in case it's modified by rsync (remember that rsync changes inode number when modifying files), line if `find` output will change, and `comm -3` output will have two lines - one for "deletion" of old line, and one for "addition" of new one - exactly what we want!
+To track also changed files, we actually need to record inode number together with filename - in case it's modified by rsync (remember that rsync changes inode number when modifying files), line if `find` output will change, and ~`diff`~ ~`comm -3` output will have two lines - one for "deletion" of old line, and one for "addition" of new one~ SQLite will see these lines as different and show one of them in list of new files, and another one - in list of deleted files - exactly what we want!
 
 Setup
 -----
@@ -62,13 +62,12 @@ It will create necessary dirs and sqlite database to hold information.
 
 ### Requirements
 
-* sqlite3
-* busybox (ash, du, df, also httpd for [WebUI](#webui))
-* find
-* flock
-* smbclient (if using password-protected dirs in WebUI)
-* par2create (if creating par2 files)
-* cpulimit (if limiting cpu usage by par2 process)
+* sqlite3 (can be accessed remotely via network)
+* busybox (ash, du, df, stat, also httpd for [WebUI](#webui))
+* find (optionally - better for performance)
+* smbclient (optionally - only if using password-protected dirs in WebUI)
+* par2create (optionally - only if creating par2 files)
+* cpulimit (optionally - only if limiting cpu usage by par2 process)
 
 
 Simple usage

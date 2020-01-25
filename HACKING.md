@@ -24,23 +24,20 @@ To select filenames:
 
 To parse filenames in `$BACKUP_CURRENT`:
 
-	cd "$BACKUP_CURRENT"
-	/usr/bin/find . $BACKUP_FIND_FILTER -printf '%i %y %h/%f\n' | sed -r "
+	my_find "$BACKUP_CURRENT" . $BACKUP_FIND_FILTER | sed -r "
 		s_^([0-9]*) (.) (.*/)([^/]*)$_	\\
 			inode=\\1	\\
 			type=\\2	\\
 			dirname=\\2	\\
 			filename=\\4	\\
 		_"
-	cd ->/dev/null
 
-Note: it is important to `cd` to dir first, use `find .`, and print `%h/%f`. It
-ia done in order to make sure that root dir has `dirname='./'` and
-`filename='.'`.
+Note: `my_find` is a wrapper around busybox find or GNU find to produce similar
+output.
 
 To parse filenames in `$BACKUP_MAIN`:
 
-	/usr/bin/find "$BACKUP_MAIN" $BACKUP_FIND_FILTER -not -type d -printf '%i %y ./%P\\n' | sed -r "
+	my_find "$BACKUP_MAIN" . $BACKUP_FIND_FILTER -not -type d | sed -r "
 		s_^([0-9]*) (.) (.*/)([^/]*)/(.*)$BACKUP_TIME_SEP(.*)$_	\\
 			inode=\\1	\\
 			type=\\2	\\

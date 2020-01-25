@@ -39,6 +39,23 @@ check_space()
 
 check_space || exit 0 # no cleanup needed
 
+# check if there is another copy of this script running
+lock_available()
+{
+	file="$1"
+	test ! -f "$file" && return 0
+	pid="$(cat "$file")"
+	test ! -d "/proc/$pid" && { echo "process $pid does not exist"; rm "$file"; return 0; }
+	test ! -f "/proc/$pid/fd/200" && { echo "process $pid does not have FD 200"; rm "$file"; return 0; }
+	test ! "$(stat -c %N /proc/$pid/fd/200)" == "/proc/$pid/fd/200 -> $file" && { echo "process $pid has FD 200 not pointing to $file"; rm "$file"; return 0; }
+	return 1
+}
+while ! lock_available; do sleep 1; done
+# acquire lock
+exec 200>"$BACKUP_FLOCK"
+echo "$$">&200
+
+
 if test "$CLEAN_BY_FREQ" = "1"; then
 	# Uses 'timeline' index to get rows with freq!=0, then builds a temporary index for age.
 	# We can't have this index permanently, since it depends on _current_ time
