@@ -77,17 +77,25 @@ my_find "$BACKUP_MAIN" . $BACKUP_FIND_FILTER -not -type d -name "*$BACKUP_TIME_S
 	\$a END TRANSACTION;" | $SQLITE
 
 echo "3: fill dirs"
-echo "SELECT dirname, MIN(created), MAX(deleted)
-		FROM history
-		GROUP BY dirname;" | $SQLITE | sed -r "
-	1i .timeout 10000
-	1i BEGIN TRANSACTION;
-	s/'/''/g        # duplicate single quotes
-	s_^./\\|_././\\|_	# special case for root dir
-	s_^(.*/)([^/|]*)/\\|([^|]*)\\|([^|]*)_	\\
-		INSERT INTO history (inode, type, dirname, filename, created, deleted, freq) VALUES	\\
-		(0, 'd', '\\1', '\\2', '\\3', '\\4', 0);_
-	\$a END TRANSACTION;" | $SQLITE
+# https://stackoverflow.com/a/34665012
+echo "WITH RECURSIVE cte(org, parent, name, rest, pos, data1, data2) AS (
+		SELECT dirname, '', '.', SUBSTR(dirname,3), 0, min(created), max(deleted) FROM history
+		GROUP BY dirname
+	UNION ALL
+		SELECT org,
+		SUBSTR(org,1,pos+length(name)+1) as parent,
+		SUBSTR(rest,1,INSTR(rest, '/')-1) as name,
+		SUBSTR(rest,INSTR(rest,'/')+1) as rest,
+		pos+length(name)+1 as pos,
+		data1, data2
+	FROM cte
+	WHERE rest <> ''
+)
+INSERT INTO history (inode, type, dirname, filename, created, deleted, freq)
+SELECT 0, 'd', parent, name, min(data1), max(data2), 0
+FROM cte
+WHERE pos <> 0
+GROUP BY parent, name;" | $SQLITE
 
 echo "4: update freq"
 echo "UPDATE history SET freq = CASE
