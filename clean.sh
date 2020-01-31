@@ -12,11 +12,14 @@
 test -z "$BACKUP_ROOT"    && exit 2
 
 test -z "$BACKUP_MAIN"    && BACKUP_MAIN=$BACKUP_ROOT/data
+test -z "$BACKUP_FLOCK"   && BACKUP_FLOCK=$BACKUP_ROOT/lock
 test -z "$BACKUP_DB"      && BACKUP_DB=$BACKUP_ROOT/backup.db
 test -z "$BACKUP_TIME_SEP" && BACKUP_TIME_SEP="~"
 test -z "$SQLITE"         && SQLITE="sqlite3 $BACKUP_DB"
 
 test -z "$CLEAN_BY_FREQ"  && CLEAN_BY_FREQ="1" # set to 0 to ignore freq when cleaning
+NL="
+"
 
 case "$2" in
 	( "%" )
@@ -42,19 +45,17 @@ check_space || exit 0 # no cleanup needed
 # check if there is another copy of this script running
 lock_available()
 {
-	file="$1"
-	test ! -f "$file" && return 0
-	pid="$(cat "$file")"
-	test ! -d "/proc/$pid" && { echo "process $pid does not exist"; rm "$file"; return 0; }
-	test ! -f "/proc/$pid/fd/200" && { echo "process $pid does not have FD 200"; rm "$file"; return 0; }
-	test ! "$(stat -c %N /proc/$pid/fd/200)" == "/proc/$pid/fd/200 -> $file" && { echo "process $pid has FD 200 not pointing to $file"; rm "$file"; return 0; }
+	test ! -f "$BACKUP_FLOCK" && return 0
+	pid="$(cat "$BACKUP_FLOCK")"
+	test ! -d "/proc/$pid" && { rm "$BACKUP_FLOCK"; return 0; }
+	test ! -f "/proc/$pid/fd/200" && { echo "process $pid does not have FD 200"; rm "$BACKUP_FLOCK"; return 0; }
+	test ! "$(stat -c %N /proc/$pid/fd/200)" == "/proc/$pid/fd/200 -> $BACKUP_FLOCK" && { echo "process $pid has FD 200 not pointing to $BACKUP_FLOCK"; rm "$BACKUP_FLOCK"; return 0; }
 	return 1
 }
 while ! lock_available; do sleep 1; done
 # acquire lock
 exec 200>"$BACKUP_FLOCK"
 echo "$$">&200
-
 
 if test "$CLEAN_BY_FREQ" = "1"; then
 	# Uses 'timeline' index to get rows with freq!=0, then builds a temporary index for age.
@@ -74,22 +75,21 @@ else
 		ORDER BY deleted ASC;"
 fi
 
-cmd="	echo '.timeout 10000'
+echo "$sql" | $SQLITE | (
+	echo '.timeout 10000'
 	echo 'BEGIN TRANSACTION;'
-	while test \$# -ge 1; do
-		test \"\$(df -PB1 '$BACKUP_MAIN' | awk 'FNR==2{print \$4}')\" -lt $FREE_SPACE_NEEDED || break
-		filename=\"\${1%%|*}\"
-		rowid=\"\${1##*|}\"
+	while IFS="$NL" read f; do
+		test "$(df -PB1 "$BACKUP_MAIN" | awk 'FNR==2{print $4}')" -lt $FREE_SPACE_NEEDED || break
+		filename="${f%%|*}"
+		rowid="${f##*|}"
 		# Note: below command will fail for directories for two reasons:
-		# 1. because '\$filename' has a creation date in it, and this is
+		# 1. because '$filename' has a creation date in it, and this is
 		# never a case for directories
 		# 2. because 'rm' command doesn't have '-r' argument, so it
 		# won't delete any directories, even if they matched.
-		rm -f \"$BACKUP_MAIN/\$filename\"* 2>/dev/null
-		echo \"DELETE FROM history WHERE rowid='\$rowid';\"
-		shift
+		rm -f "$BACKUP_MAIN/$filename"* 2>/dev/null
+		echo "DELETE FROM history WHERE rowid='$rowid';"
 	done
 	echo 'END TRANSACTION;'
-	echo 'PRAGMA optimize;'"
-
-echo "$sql" | $SQLITE | tr '\n' '\0' | xargs -0 sh -c "$cmd" x | $SQLITE
+	echo 'PRAGMA optimize;'
+) | $SQLITE

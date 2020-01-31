@@ -20,6 +20,8 @@ test -z "$SQLITE"         && SQLITE="sqlite3 $BACKUP_DB"
 # see backup1.sh for explanation
 BACKUP_MAX_FREQ_SEC="$(echo "2592000 $BACKUP_MAX_FREQ / p" | dc)"
 
+NL="
+"
 # `find` replacement, which scans a given dir and for each object found it prints:
 # * its inode number
 # * its type ('f' for file, 'd' for dir, 's' for others)
@@ -39,7 +41,9 @@ my_find()
 		     s/^([0-9]*) directory /\1 d /
 		     t
 		     s/^([0-9]*) [^.]* /\1 s /'
-		find "$@" | xargs stat -c '%i %F %n' | sed -r '$sed'
+		find "$@" | while IFS="$NL" read f; do
+			stat -c '%i %F %n' "$f"
+		done | sed -r '$sed'
 	fi
 	cd -> /dev/null
 }
@@ -47,12 +51,11 @@ my_find()
 # check if there is another copy of this script running
 lock_available()
 {
-	file="$1"
-	test ! -f "$file" && return 0
-	pid="$(cat "$file")"
-	test ! -d "/proc/$pid" && { echo "process $pid does not exist"; rm "$file"; return 0; }
-	test ! -f "/proc/$pid/fd/200" && { echo "process $pid does not have FD 200"; rm "$file"; return 0; }
-	test ! "$(stat -c %N /proc/$pid/fd/200)" == "/proc/$pid/fd/200 -> $file" && { echo "process $pid has FD 200 not pointing to $file"; rm "$file"; return 0; }
+	test ! -f "$BACKUP_FLOCK" && return 0
+	pid="$(cat "$BACKUP_FLOCK")"
+	test ! -d "/proc/$pid" && { rm "$BACKUP_FLOCK"; return 0; }
+	test ! -f "/proc/$pid/fd/200" && { echo "process $pid does not have FD 200"; rm "$BACKUP_FLOCK"; return 0; }
+	test ! "$(stat -c %N /proc/$pid/fd/200)" == "/proc/$pid/fd/200 -> $BACKUP_FLOCK" && { echo "process $pid has FD 200 not pointing to $BACKUP_FLOCK"; rm "$BACKUP_FLOCK"; return 0; }
 	return 1
 }
 if ! lock_available; then
@@ -77,48 +80,46 @@ fi
 
 db2current ()
 {
-	cmd="	echo '.timeout 10000'
-		echo 'BEGIN TRANSACTION;'
-		while test \$# -ge 1; do
-			filename=\"\${1%%|*}\"
-			rowid=\"\${1##*|}\"
-			if ! test -f \"$BACKUP_CURRENT/\$filename\" -o -L \"$BACKUP_CURRENT/\$filename\"; then
-				echo \"$BACKUP_CURRENT/\$filename\" >>check.db2current
-				test -n \"$FIX\" && echo \"DELETE FROM history WHERE rowid='\$rowid';\"
-			fi
-			shift
-		done
-		echo 'END TRANSACTION;'
-		"
 	echo "SELECT dirname || filename,
 			rowid
 		FROM history
 		WHERE freq = 0
 		  AND type != 'd'
-		ORDER BY dirname;" | $SQLITE | tr '\n' '\0' | xargs -0 sh -c "$cmd" x | $SQLITE
+		ORDER BY dirname;" | $SQLITE | (
+			echo '.timeout 10000'
+			echo 'BEGIN TRANSACTION;'
+			while IFS="$NL" read f; do
+				filename="${f%%|*}"
+				rowid="${f##*|}"
+				if ! test -f "$BACKUP_CURRENT/$filename" -o -L "$BACKUP_CURRENT/$filename"; then
+					echo "$BACKUP_CURRENT/$filename" >>check.db2current
+					test -n "$FIX" && echo "DELETE FROM history WHERE rowid='$rowid';"
+				fi
+			done
+			echo 'END TRANSACTION;'
+			) | $SQLITE
 }
 
 db2current_dirs ()
 {
-	cmd="	echo '.timeout 10000'
-		echo 'BEGIN TRANSACTION;'
-		while test \$# -ge 1; do
-			filename=\"\${1%%|*}\"
-			rowid=\"\${1##*|}\"
-			if ! test -d \"$BACKUP_CURRENT/\$filename\"; then
-				echo \"$BACKUP_CURRENT/\$filename\" >>check.db2current_dirs
-				test -n \"$FIX\" && echo \"DELETE FROM history WHERE rowid='\$rowid';\"
-			fi
-			shift
-		done
-		echo 'END TRANSACTION;'
-		"
 	echo "SELECT dirname || filename,
 			rowid
 		FROM history
 		WHERE freq = 0
 		  AND type = 'd'
-		ORDER BY dirname;" | $SQLITE | tr '\n' '\0' | xargs -0 sh -c "$cmd" x | $SQLITE
+		ORDER BY dirname;" | $SQLITE | (
+			echo '.timeout 10000'
+			echo 'BEGIN TRANSACTION;'
+			while IFS="$NL" read f; do
+				filename="${f%%|*}"
+				rowid="${f##*|}"
+				if ! test -d "$BACKUP_CURRENT/$filename"; then
+					echo "$BACKUP_CURRENT/$filename" >>check.db2current_dirs
+					test -n "$FIX" && echo "DELETE FROM history WHERE rowid='$rowid';"
+				fi
+			done
+			echo 'END TRANSACTION;'
+			) | $SQLITE
 }
 
 db2old ()
@@ -140,7 +141,19 @@ db2old ()
 			rowid
 		FROM history
 		WHERE type != 'd'
-		ORDER BY dirname;" | $SQLITE | tr '\n' '\0' | xargs -0 sh -c "$cmd" x | $SQLITE
+		ORDER BY dirname;" | $SQLITE | (
+			echo '.timeout 10000'
+			echo 'BEGIN TRANSACTION;'
+			while IFS="$NL" read f; do
+				filename="${f%%|*}"
+				rowid="${f##*|}"
+				if ! test -f "$BACKUP_MAIN/$filename" -o -L "$BACKUP_MAIN/$filename"; then
+					echo "$BACKUP_MAIN/$filename" >>check.db2old
+					test -n "$FIX" && echo "DELETE FROM history WHERE rowid='$rowid';"
+				fi
+			done
+			echo 'END TRANSACTION;'
+			) | $SQLITE
 }
 
 current2db ()
@@ -227,33 +240,29 @@ old2db ()
 
 old2current ()
 {
-	cmd="	while test \$# -ge 1; do
-			# $1 points to the file in data dir - i.e. it's like this:
-			# dirname/filename/created~now
-			filename=\"\${1%/*}\"
-			if ! test -f \"$BACKUP_CURRENT/\$filename\" -o -L \"$BACKUP_CURRENT/\$filename\"; then
-				echo \"ln $BACKUP_MAIN/\$1 => $BACKUP_CURRENT/\$filename\"
-				if test -n \"$FIX\"; then
-					mkdir -p \"$BACKUP_CURRENT/\${filename%/*}\"
-					ln \"$BACKUP_MAIN/\$1\" \"$BACKUP_CURRENT/\$filename\"
-				fi
-			fi
-			shift
-		done"
 	cd "$BACKUP_MAIN"
-	find . -not -type d -name "*$BACKUP_TIME_SEP$BACKUP_TIME_NOW" -print0 | xargs -0 sh -c "$cmd" x >"$BACKUP_ROOT/check.old2current"
+	find . -not -type d -name "*$BACKUP_TIME_SEP$BACKUP_TIME_NOW" | while IFS="$NL" read f; do
+				# $f points to the file in data dir - i.e. it's like this:
+				# dirname/filename/created~now
+				filename="${f%/*}"
+				if ! test -f "$BACKUP_CURRENT/$filename" -o -L "$BACKUP_CURRENT/$filename"; then
+					echo "ln $BACKUP_MAIN/$1 => $BACKUP_CURRENT/$filename"
+					if test -n "$FIX"; then
+						mkdir -p "$BACKUP_CURRENT/${filename%/*}"
+						ln "$BACKUP_MAIN/$1" "$BACKUP_CURRENT/$filename"
+					fi
+				fi
+			done
 	cd -> /dev/null
 }
 
 current2old ()
 {
-	cmd="	while test \$# -ge 1; do
-			inode=\"\${1%%|*}\"
-			fullname=\"\${1##*|}\"
-			ls -i \"$BACKUP_MAIN/\$fullname\" 2>/dev/null | grep -q \"^ *\$inode \" || echo \"\$fullname\"
-			shift
-		done"
-	my_find "$BACKUP_CURRENT" . -not -type d | sed -r 's/^([0-9]*) . (.*)/\1|\2/' | tr '\n' '\0' | xargs -0 sh -c "$cmd" x | (
+	my_find "$BACKUP_CURRENT" . -not -type d | sed -r 's/^([0-9]*) . (.*)/\1|\2/' | while IFS="$NL" read f; do
+		inode="${f%%|*}"
+		fullname="${f##*|}"
+		ls -i "$BACKUP_MAIN/$fullname" 2>/dev/null | grep -q "^ *$inode " || echo "$fullname"
+	done | (
 		if test -n "$FIX"; then
 			cd "$BACKUP_CURRENT"
 			# These files might either be in DB, or not. If they
@@ -277,22 +286,6 @@ current2old ()
 
 db_overlaps ()
 {
-	cmd="	echo '.timeout 10000'
-		echo 'BEGIN TRANSACTION;'
-		while test \$# -ge 1; do
-			filenames=\"\${1%|*}\"
-			filename1=\"\${filenames%%|*}\"
-			filename2=\"\${filenames##*|}\"
-			sql=\"\${1##*|}\"
-			echo \"[\$filename1][\$filename2][\$sql]\" >>check.db_overlaps
-			if test -n \"$FIX\"; then
-				mv \"$BACKUP_MAIN/\$filename1\" \"$BACKUP_MAIN/\$filename2\"
-				echo \"\$sql\"
-			fi
-			shift
-		done
-		echo 'END TRANSACTION;'
-		"
 	echo "SELECT
 			a.dirname || a.filename || '/' || a.created || '$BACKUP_TIME_SEP' || a.deleted,
 			a.dirname || a.filename || '/' || a.created || '$BACKUP_TIME_SEP' || b.created,
@@ -304,7 +297,22 @@ db_overlaps ()
 			AND a.created < b.deleted
 			AND b.created < a.deleted
 		GROUP BY a.dirname, a.filename, a.created;
-		" | $SQLITE | tr '\n' '\0' | xargs -0 sh -c "$cmd" x | $SQLITE
+		" | $SQLITE | (
+			echo '.timeout 10000'
+			echo 'BEGIN TRANSACTION;'
+			while IFS="$NL" read f; do
+				filenames="${f%|*}"
+				filename1="${filenames%%|*}"
+				filename2="${filenames##*|}"
+				sql="${f##*|}"
+				echo "[$filename1][$filename2][$sql]" >>check.db_overlaps
+				if test -n "$FIX"; then
+					mv "$BACKUP_MAIN/$filename1" "$BACKUP_MAIN/$filename2"
+					echo "$sql"
+				fi
+			done
+			echo 'END TRANSACTION;'
+			) | $SQLITE
 }
 
 db_order ()
@@ -317,7 +325,10 @@ db_order ()
 		"
 	echo "SELECT dirname || filename || '/' || created || '$BACKUP_TIME_SEP' || deleted
 		FROM history
-		WHERE created >= deleted;" | $SQLITE | tr '\n' '\0' | xargs -0 sh -c "$cmd" x >check.db_order
+		WHERE created >= deleted;" | $SQLITE | while IFS="$NL" read f; do
+			echo rm "$BACKUP_MAIN/$1" >>check.db_order
+			test -n "$FIX" && rm "$BACKUP_MAIN/$1"
+		done
 }
 
 db_dups_created ()

@@ -16,6 +16,8 @@ test -z "$SQLITE"         && SQLITE="sqlite3 $BACKUP_DB"
 # see backup1.sh for explanation
 BACKUP_MAX_FREQ_SEC="$(echo "2592000 $BACKUP_MAX_FREQ / p" | dc)"
 
+NL="
+"
 # `find` replacement, which scans a given dir and for each object found it prints:
 # * its inode number
 # * its type ('f' for file, 'd' for dir, 's' for others)
@@ -35,7 +37,9 @@ my_find()
 		     s/^([0-9]*) directory /\1 d /
 		     t
 		     s/^([0-9]*) [^.]* /\1 s /'
-		find "$@" | xargs stat -c '%i %F %n' | sed -r '$sed'
+		find "$@" | while IFS="$NL" read f; do
+			stat -c '%i %F %n' "$f"
+		done | sed -r '$sed'
 	fi
 	cd -> /dev/null
 }
@@ -43,12 +47,11 @@ my_find()
 # check if there is another copy of this script running
 lock_available()
 {
-	file="$1"
-	test ! -f "$file" && return 0
-	pid="$(cat "$file")"
-	test ! -d "/proc/$pid" && { echo "process $pid does not exist"; rm "$file"; return 0; }
-	test ! -f "/proc/$pid/fd/200" && { echo "process $pid does not have FD 200"; rm "$file"; return 0; }
-	test ! "$(stat -c %N /proc/$pid/fd/200)" == "/proc/$pid/fd/200 -> $file" && { echo "process $pid has FD 200 not pointing to $file"; rm "$file"; return 0; }
+	test ! -f "$BACKUP_FLOCK" && return 0
+	pid="$(cat "$BACKUP_FLOCK")"
+	test ! -d "/proc/$pid" && { rm "$BACKUP_FLOCK"; return 0; }
+	test ! -f "/proc/$pid/fd/200" && { echo "process $pid does not have FD 200"; rm "$BACKUP_FLOCK"; return 0; }
+	test ! "$(stat -c %N /proc/$pid/fd/200)" == "/proc/$pid/fd/200 -> $BACKUP_FLOCK" && { echo "process $pid has FD 200 not pointing to $BACKUP_FLOCK"; rm "$BACKUP_FLOCK"; return 0; }
 	return 1
 }
 if ! lock_available; then
@@ -128,17 +131,13 @@ if test "$1" = "--current"; then
 
 	rm -rf "$BACKUP_CURRENT"
 
-	cmd="
-	while test \$# -ge 1; do
-		fullname=\"\$(dirname \"\$1\")\"
-		mkdir -p \"$BACKUP_CURRENT/\$(dirname \"\$fullname\")\"
-		ln \"$BACKUP_MAIN/\$1\" \"$BACKUP_CURRENT/\$fullname\"
-		shift
-	done"
-
-	# note that this uses simple -print0 which is supported both in GNU and busybox find
+	# note that this simply prints fiilenames so no need to use my_find
 	cd "$BACKUP_MAIN"
-	find . $BACKUP_FIND_FILTER -not -type d -name "*$BACKUP_TIME_SEP$BACKUP_TIME_NOW" -print0 | xargs -r -0 sh -c "$cmd" x
+	find . $BACKUP_FIND_FILTER -not -type d -name "*$BACKUP_TIME_SEP$BACKUP_TIME_NOW" | while IFS="$NL" read f; do
+		fullname="$(dirname "$f")"
+		mkdir -p "$BACKUP_CURRENT/$(dirname "$fullname")"
+		ln "$BACKUP_MAIN/$f" "$BACKUP_CURRENT/$fullname"
+	done
 	cd -> /dev/null
 fi
 

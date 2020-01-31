@@ -29,14 +29,9 @@ sql="PRAGMA case_sensitive_like = ON;
 	  AND created <= '$SHOW_DATE'
 	  AND deleted > '$SHOW_DATE';"
 
-cmd="
-	while test \$# -ge 1; do
-		fullname=\"\${1%|*}\"
-		times=\"\${1#*|}\"
-		mkdir -p \"$SHOW_IN/\$(dirname \"\$fullname\")\"
-		ln \"$BACKUP_MAIN/\$fullname/\$times\" \"$SHOW_IN/\$fullname\"
-		shift
-	done
-"
-
-echo "$sql" | $SQLITE | tr '\n' '\0' | xargs -0 sh -c "$cmd" x
+echo "$sql" | $SQLITE | tr '\n' '\0' | while IFS="$NL" read f; do
+	fullname="${f%|*}"
+	times="${f#*|}"
+	mkdir -p "$SHOW_IN/$(dirname "$fullname")"
+	ln "$BACKUP_MAIN/$fullname/$times" "$SHOW_IN/$fullname"
+done

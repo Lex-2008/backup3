@@ -26,6 +26,8 @@ test -z "$SQLITE"         && SQLITE="sqlite3 $BACKUP_DB"
 # usually 300 seconds for BACKUP_MAX_FREQ=8640 (5 minutes)
 BACKUP_MAX_FREQ_SEC="$(echo "2592000 $BACKUP_MAX_FREQ / p" | dc)"
 
+NL="
+"
 # `find` replacement, which scans a given dir and for each object found it prints:
 # * its inode number
 # * its type ('f' for file, 'd' for dir, 's' for others)
@@ -38,17 +40,17 @@ my_find()
 {
 	cd "$1"
 	shift
-	# echo "==find==" >&2
-	# echo "$@" >&2
-	# echo "==end==" >&2
 	if test -f /usr/bin/find && /usr/bin/find --version 2>&1 | grep -q GNU; then
-		/usr/bin/find "$@" -printf '%i %y %h/%f\n' | tee /tmp/tmp1
+		/usr/bin/find "$@" -printf '%i %y %h/%f\n'
 	else
 		sed='s/^([0-9]*) regular( empty)? file /\1 f /
 		     s/^([0-9]*) directory /\1 d /
+		     s_^([0-9]*) d .$_\1 d ./._
 		     t
 		     s/^([0-9]*) [^.]* /\1 s /'
-		find "$@" | xargs stat -c '%i %F %n' | sed -r '$sed' | tee /tmp/tmp2
+		find "$@" | while IFS="$NL" read f; do
+			stat -c '%i %F %n' "$f"
+		done | sed -r "$sed"
 	fi
 	cd -> /dev/null
 }
@@ -56,12 +58,11 @@ my_find()
 # check if there is another copy of this script running
 lock_available()
 {
-	file="$1"
-	test ! -f "$file" && return 0
-	pid="$(cat "$file")"
-	test ! -d "/proc/$pid" && { echo "process $pid does not exist"; rm "$file"; return 0; }
-	test ! -f "/proc/$pid/fd/200" && { echo "process $pid does not have FD 200"; rm "$file"; return 0; }
-	test ! "$(stat -c %N /proc/$pid/fd/200)" == "/proc/$pid/fd/200 -> $file" && { echo "process $pid has FD 200 not pointing to $file"; rm "$file"; return 0; }
+	test ! -f "$BACKUP_FLOCK" && return 0
+	pid="$(cat "$BACKUP_FLOCK")"
+	test ! -d "/proc/$pid" && { rm "$BACKUP_FLOCK"; return 0; }
+	test ! -f "/proc/$pid/fd/200" && { echo "process $pid does not have FD 200"; rm "$BACKUP_FLOCK"; return 0; }
+	test ! "$(stat -c %N /proc/$pid/fd/200)" == "/proc/$pid/fd/200 -> $BACKUP_FLOCK" && { echo "process $pid has FD 200 not pointing to $BACKUP_FLOCK"; rm "$BACKUP_FLOCK"; return 0; }
 	return 1
 }
 if ! lock_available; then
@@ -92,9 +93,9 @@ run_rsync()
 	# test if we need to run it at all - or not enough time had passed
 	test "$(date -r "$logfile" +"$date_fmt" 2>/dev/null)" = "$(date -d "$BACKUP_TIME" +"$date_fmt")" && return 0
 	# test if we can connect
-	timeout rsync "$@" "$from" >/dev/null 2>&1 || return 0
+	test -d "$from" || timeout rsync "$@" "$from" >/dev/null 2>&1 || return 0
 	# sync files
-	timeout -t "$BACKUP_TIMEOUT" rsync -a --itemize-changes --human-readable --stats --delete --one-file-system "$@" "$from" "$BACKUP_CURRENT/$to" >"$logfile"
+	timeout -t "$BACKUP_TIMEOUT" rsync -a --itemize-changes --stats --delete --one-file-system "$@" "$from" "$BACKUP_CURRENT/$to" >"$logfile"
 	# add them to DB
 	compare "$to"
 }
@@ -215,38 +216,24 @@ compare()
 		WHERE type != 'd';
 		"
 
-	# Shell command to operate on new files:
-	# * link them from 'current' to 'data' dir
-	cmd_new="cd \"$BACKUP_MAIN\"
-	mkdir -p \"\$@\"
-	while test \$# -ge 1; do
-		ln \"$BACKUP_CURRENT/\$1\" \"\$1/$BACKUP_TIME$BACKUP_TIME_SEP$BACKUP_TIME_NOW\"
-		shift
-	done"
+	# Main pipeline
+	my_find "$BACKUP_CURRENT" "$ddir" $BACKUP_FIND_FILTER | ( sed -r "$sed"; echo "$sql" ) | $SQLITE >"$BACKUP_FIFO"
 
-	# Shell command to operate on old files:
-	# * change deleted date in filename from '~now' to '~$BACKUP_TIME'
-	cmd_old="cd \"$BACKUP_MAIN\"
-	while test \$# -ge 1; do
-		mv \"\$1$BACKUP_TIME_SEP$BACKUP_TIME_NOW\" \"\$1$BACKUP_TIME_SEP$BACKUP_TIME\"
-		shift
-	done"
+	# Pipeline for new files
+	sed '1d;/^separator$/,$d' "$BACKUP_FIFO" | while IFS="$NL" read f; do
+		mkdir -p "$BACKUP_MAIN/$f"
+		ln "$BACKUP_CURRENT/$f" "$BACKUP_MAIN/$f/$BACKUP_TIME$BACKUP_TIME_SEP$BACKUP_TIME_NOW"
+	done &
 
-	# Pipes for new and old file pipelines
-	mkfifo "$BACKUP_FIFO.new"
-	mkfifo "$BACKUP_FIFO.old"
-
-	# Pipelines for new and old files
-	sed '1d;/^separator$/,$d' "$BACKUP_FIFO.new" | tr '\n' '\0' | xargs -r -0 sh -c "$cmd_new" x &
-	sed '1,/^separator$/d' "$BACKUP_FIFO.old" | tr '\n' '\0' | xargs -r -0 sh -c "$cmd_old" x &
-
-	# Common pipeline
-	my_find  "$BACKUP_CURRENT" "$ddir" $BACKUP_FIND_FILTER | ( sed -r "$sed"; echo "$sql" ) | $SQLITE | tee "$BACKUP_FIFO.new" >"$BACKUP_FIFO.old"
+	# Pipeline for old files
+	sed '1,/^separator$/d' "$BACKUP_FIFO" | while IFS="$NL" read f; do
+		mv "$BACKUP_MAIN/$f$BACKUP_TIME_SEP$BACKUP_TIME_NOW" "$BACKUP_MAIN/$f$BACKUP_TIME_SEP$BACKUP_TIME"
+	done &
 
 	# wait for background jobs to finish
 	wait
 
-	rm "$BACKUP_FIFO"*
+	rm "$BACKUP_FIFO"
 }
 
 ### RUN ###

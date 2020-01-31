@@ -1,18 +1,15 @@
 Style
 -----
 
-Use pipes, like this:
+Use pipes and while loops, like this:
 
-	cmd="	while test \$# -ge 1; do
-			# operate on \$1
-			shift
-		done"
+	NL="
+	"
+	echo "$sql" | $SQLITE | while IFS="$NL" read f; do
+		# operate on "$f"
+	done | $SQLITE
 
-	echo "$sql" | $SQLITE | tr '\n' '\0' | xargs -0 sh -c "$cmd" x | $SQLITE
-
-Note that sqlite doesn't support null-separated lines, so we have to use `tr`.
-
-Note the busybox `sh` syntax: `-c 'SCRIPT' [ARG0 [ARGS]` hence "x" as ARG0
+Note `IFS="$NL"` before `read`!
 
 Note that some implementations of $SQLITE don't support receiving sql expression
 as an argument (most notably, "remote SQLite"), hence please avoid using it.

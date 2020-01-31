@@ -15,6 +15,7 @@ test -z "$SQLITE"         && SQLITE="sqlite3 $BACKUP_DB"
 mkdir -p $BACKUP_CURRENT $BACKUP_MAIN $BACKUP_RSYNC_LOGS
 
 test "$1" = "--notable" || echo "
+DROP TABLE IF EXISTS history;
 PRAGMA journal_mode=WAL;
 CREATE TABLE history(
 	inode INTEGER,
