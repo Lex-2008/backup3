@@ -177,12 +177,17 @@ compare()
 
 ### RUN ###
 
+check_db
+
+test "$BACKUP_CLEAN_ON" == 'pre' && $BIN/clean.sh $BACKUP_CLEAN_VAL
+
 if command -v run_this >/dev/null; then
-	check_db
 	run_this
 else
 	compare
 fi
+
+test "$BACKUP_CLEAN_ON" == 'post' && $BIN/clean.sh $BACKUP_CLEAN_VAL
 
 # release the lock
 rm "$BACKUP_FLOCK"
