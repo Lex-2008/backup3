@@ -9,17 +9,7 @@
 # $ clean.sh 10 %
 # to ensure that you have at least 10% of disk space free.
 
-test -z "$BACKUP_ROOT"    && exit 2
-
-test -z "$BACKUP_MAIN"    && BACKUP_MAIN=$BACKUP_ROOT/data
-test -z "$BACKUP_FLOCK"   && BACKUP_FLOCK=$BACKUP_ROOT/lock
-test -z "$BACKUP_DB"      && BACKUP_DB=$BACKUP_ROOT/backup.db
-test -z "$BACKUP_TIME_SEP" && BACKUP_TIME_SEP="~"
-test -z "$SQLITE"         && SQLITE="sqlite3 $BACKUP_DB"
-
-test -z "$CLEAN_BY_FREQ"  && CLEAN_BY_FREQ="1" # set to 0 to ignore freq when cleaning
-NL="
-"
+. "$(dirname "$0")/common.sh"
 
 case "$2" in
 	( "%" )

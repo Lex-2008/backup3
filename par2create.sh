@@ -16,16 +16,7 @@
 # to create par2 archives (or duplicates) of all files in backups which are
 # older than 2 but newer than 3 months old
 
-test -z "$BACKUP_ROOT"    && exit 2
-
-test -z "$BACKUP_MAIN"    && BACKUP_MAIN=$BACKUP_ROOT/data
-test -z "$BACKUP_DB"      && BACKUP_DB=$BACKUP_ROOT/backup.db
-test -z "$BACKUP_FLOCK"   && BACKUP_FLOCK=$BACKUP_ROOT/lock
-test -z "$BACKUP_TIME_SEP" && BACKUP_TIME_SEP="~" # must be regexp-safe
-test -z "$BACKUP_TIME_NOW" && BACKUP_TIME_NOW=now # must be 'now' or valid date in future
-test -z "$BACKUP_PAR2_SIZELIMIT" && BACKUP_PAR2_SIZELIMIT=300000 # minimum file size to create *.par2 archive, smaller files are copied to *.bak ones as-is
-test -z "$BACKUP_PAR2_CPULIMIT" && BACKUP_PAR2_CPULIMIT=0 # limit CPU usage by par2 process
-test -z "$SQLITE"         && SQLITE="sqlite3 $BACKUP_DB"
+. "$(dirname "$0")/common.sh"
 
 cond2="AND created<strftime('%Y-%m', 'now')"
 if test ! -z "$1"; then

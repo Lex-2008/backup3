@@ -2,15 +2,7 @@
 #
 # Script to init DB.
 
-
-test -z "$BACKUP_ROOT"    && exit 2
-
-test -z "$BACKUP_CURRENT" && BACKUP_CURRENT=$BACKUP_ROOT/current
-test -z "$BACKUP_MAIN"    && BACKUP_MAIN=$BACKUP_ROOT/data
-test -z "$BACKUP_DB"      && BACKUP_DB=$BACKUP_ROOT/backup.db
-test -z "$BACKUP_RSYNC_LOGS" && BACKUP_RSYNC_LOGS=$BACKUP_ROOT/rsync.logs
-test -z "$SQLITE"         && SQLITE="sqlite3 $BACKUP_DB"
-
+. "$(dirname "$0")/common.sh"
 
 mkdir -p $BACKUP_CURRENT $BACKUP_MAIN $BACKUP_RSYNC_LOGS
 

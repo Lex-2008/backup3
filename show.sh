@@ -8,11 +8,7 @@
 # Note that "./stuff/" should begin with "./" and end with "/", as dirname are
 # stored in DB, but "/tmp/dir" might be without trailing slash.
 
-test -z "$BACKUP_ROOT"    && exit 2
-test -z "$BACKUP_MAIN"    && BACKUP_MAIN=$BACKUP_ROOT/data
-test -z "$BACKUP_DB"      && BACKUP_DB=$BACKUP_ROOT/backup.db
-test -z "$BACKUP_TIME_SEP" && BACKUP_TIME_SEP="~"
-test -z "$SQLITE"         && SQLITE="sqlite3 $BACKUP_DB"
+. "$(dirname "$0")/common.sh"
 
 SHOW_DATE="$1"
 SHOW_DIR="$2"

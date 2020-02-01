@@ -2,65 +2,7 @@
 #
 # Rebuild database from files.
 
-test -z "$BACKUP_ROOT"    && exit 2
-
-test -z "$BACKUP_CURRENT" && BACKUP_CURRENT=$BACKUP_ROOT/current
-test -z "$BACKUP_FLOCK"   && BACKUP_FLOCK=$BACKUP_ROOT/lock
-test -z "$BACKUP_MAIN"    && BACKUP_MAIN=$BACKUP_ROOT/data
-test -z "$BACKUP_DB"      && BACKUP_DB=$BACKUP_ROOT/backup.db
-test -z "$BACKUP_TIME_SEP" && BACKUP_TIME_SEP="~" # must NOT be /
-test -z "$BACKUP_TIME_NOW" && BACKUP_TIME_NOW=now
-test -z "$BACKUP_MAX_FREQ" && BACKUP_MAX_FREQ=8640
-test -z "$SQLITE"         && SQLITE="sqlite3 $BACKUP_DB"
-
-# see backup1.sh for explanation
-BACKUP_MAX_FREQ_SEC="$(echo "2592000 $BACKUP_MAX_FREQ / p" | dc)"
-
-NL="
-"
-# `find` replacement, which scans a given dir and for each object found it prints:
-# * its inode number
-# * its type ('f' for file, 'd' for dir, 's' for others)
-# * its name
-# all in one line
-# Arguments:
-# * dir to `cd` prior to `find`
-# * dirname and other filters to pass to `find`
-my_find()
-{
-	cd "$1"
-	shift
-	if test -f /usr/bin/find && /usr/bin/find --version 2>&1 | grep -q GNU; then
-		/usr/bin/find "$@" -printf '%i %y %h/%f\n'
-	else
-		sed='s/^([0-9]*) regular( empty)? file /\1 f /
-		     s/^([0-9]*) directory /\1 d /
-		     t
-		     s/^([0-9]*) [^.]* /\1 s /'
-		find "$@" | while IFS="$NL" read f; do
-			stat -c '%i %F %n' "$f"
-		done | sed -r '$sed'
-	fi
-	cd -> /dev/null
-}
-
-# check if there is another copy of this script running
-lock_available()
-{
-	test ! -f "$BACKUP_FLOCK" && return 0
-	pid="$(cat "$BACKUP_FLOCK")"
-	test ! -d "/proc/$pid" && { rm "$BACKUP_FLOCK"; return 0; }
-	test ! -f "/proc/$pid/fd/200" && { echo "process $pid does not have FD 200"; rm "$BACKUP_FLOCK"; return 0; }
-	test ! "$(stat -c %N /proc/$pid/fd/200)" == "/proc/$pid/fd/200 -> $BACKUP_FLOCK" && { echo "process $pid has FD 200 not pointing to $BACKUP_FLOCK"; rm "$BACKUP_FLOCK"; return 0; }
-	return 1
-}
-if ! lock_available; then
-	test -z "$BACKUP_WAIT_FLOCK" && exit 200
-	while ! lock_available; do sleep 1; done
-fi
-# acquire lock
-exec 200>"$BACKUP_FLOCK"
-echo "$$">&200
+. "$(dirname "$0")/common.sh"
 
 echo "### DATABASE ###"
 
