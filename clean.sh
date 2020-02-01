@@ -82,4 +82,8 @@ echo "$sql" | $SQLITE | (
 	done
 	echo 'END TRANSACTION;'
 	echo 'PRAGMA optimize;'
-) | $SQLITE
+) > "$BACKUP_TMP".sql
+
+<"$BACKUP_TMP".sql | $SQLITE
+
+rm "$BACKUP_TMP".sql
