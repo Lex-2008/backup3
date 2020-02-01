@@ -1,23 +1,15 @@
-#!/bin/busybox ash
+#!/bin/false
+# This file should be sourced by backup.sh
 #
 # Script to clean up space.
-#
-# Call it like this:
-# $ clean.sh 10 G
-# to ensure that you have at least 10GB of disk space free.
-# Or like this:
-# $ clean.sh 10 %
-# to ensure that you have at least 10% of disk space free.
 
-. "$(dirname "$0")/common.sh"
-
-case "$2" in
+case "$BACKUP_CLEAN_VAR" in
 	( "%" )
 		total_space=$(df -PB1 "$BACKUP_MAIN" | awk 'FNR==2{print $2}')
-		FREE_SPACE_NEEDED=$(dc $total_space 100 / $1 \* 0 or p)
+		FREE_SPACE_NEEDED=$(dc $total_space 100 / $BACKUP_CLEAN_VAL \* 0 or p)
 		;;
 	( "G" )
-		FREE_SPACE_NEEDED=${1}024024024
+		FREE_SPACE_NEEDED=${BACKUP_CLEAN_VAL}024024024
 		;;
 	( * )
 		exit 2
@@ -30,22 +22,7 @@ check_space()
 	test "$free_space_available" -lt "$FREE_SPACE_NEEDED"
 }
 
-check_space || exit 0 # no cleanup needed
-
-# check if there is another copy of this script running
-lock_available()
-{
-	test ! -f "$BACKUP_FLOCK" && return 0
-	pid="$(cat "$BACKUP_FLOCK")"
-	test ! -d "/proc/$pid" && { rm "$BACKUP_FLOCK"; return 0; }
-	test ! -f "/proc/$pid/fd/200" && { echo "process $pid does not have FD 200"; rm "$BACKUP_FLOCK"; return 0; }
-	test ! "$(stat -c %N /proc/$pid/fd/200)" == "/proc/$pid/fd/200 -> $BACKUP_FLOCK" && { echo "process $pid has FD 200 not pointing to $BACKUP_FLOCK"; rm "$BACKUP_FLOCK"; return 0; }
-	return 1
-}
-while ! lock_available; do sleep 1; done
-# acquire lock
-exec 200>"$BACKUP_FLOCK"
-echo "$$">&200
+check_space || return 0 # no cleanup needed
 
 if test "$CLEAN_BY_FREQ" = "1"; then
 	# Uses 'timeline' index to get rows with freq!=0, then builds a temporary index for age.
@@ -69,7 +46,7 @@ echo "$sql" | $SQLITE | (
 	echo '.timeout 10000'
 	echo 'BEGIN TRANSACTION;'
 	while IFS="$NL" read f; do
-		test "$(df -PB1 "$BACKUP_MAIN" | awk 'FNR==2{print $4}')" -lt $FREE_SPACE_NEEDED || break
+		check_space || break
 		filename="${f%%|*}"
 		rowid="${f##*|}"
 		# Note: below command will fail for directories for two reasons:
