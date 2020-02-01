@@ -7,7 +7,7 @@ test -z "$BACKUP_ROOT"    && exit 2
 test -z "$BACKUP_CURRENT" && BACKUP_CURRENT=$BACKUP_ROOT/current
 test -z "$BACKUP_FLOCK"   && BACKUP_FLOCK=$BACKUP_ROOT/lock
 test -z "$BACKUP_WAIT_FLOCK" # this is fine
-test -z "$BACKUP_FIFO"    && BACKUP_FIFO=$BACKUP_ROOT/fifo
+test -z "$BACKUP_TMP"     && BACKUP_TMP=$BACKUP_ROOT/tmp
 test -z "$BACKUP_MAIN"    && BACKUP_MAIN=$BACKUP_ROOT/data
 test -z "$BACKUP_RSYNC_LOGS" && BACKUP_RSYNC_LOGS=$BACKUP_ROOT/rsync.logs
 test -z "$BACKUP_FIND_FILTER" # this is fine
@@ -72,6 +72,11 @@ fi
 # acquire lock
 exec 200>"$BACKUP_FLOCK"
 echo "$$">&200
+
+check_db()
+{
+	echo .schema | $SQLITE | grep -q history || exit 1
+}
 
 ### RSYNC ###
 
@@ -216,29 +221,37 @@ compare()
 		WHERE type != 'd';
 		"
 
-	# Main pipeline
-	my_find "$BACKUP_CURRENT" "$ddir" $BACKUP_FIND_FILTER | ( sed -r "$sed"; echo "$sql" ) | $SQLITE >"$BACKUP_FIFO"
+	# List all files and build SQL query
+	my_find "$BACKUP_CURRENT" "$ddir" $BACKUP_FIND_FILTER | ( sed -r "$sed"; echo "$sql" ) >"$BACKUP_TMP".sql
 
-	# Pipeline for new files
-	sed '1d;/^separator$/,$d' "$BACKUP_FIFO" | while IFS="$NL" read f; do
+	# Exit if there's no DB
+	check_db
+
+	# run SQL query
+	<"$BACKUP_TMP".sql $SQLITE >"$BACKUP_TMP".files
+
+	# Operate on new files
+	sed '1d;/^separator$/,$d' "$BACKUP_TMP".files | while IFS="$NL" read f; do
 		mkdir -p "$BACKUP_MAIN/$f"
 		ln "$BACKUP_CURRENT/$f" "$BACKUP_MAIN/$f/$BACKUP_TIME$BACKUP_TIME_SEP$BACKUP_TIME_NOW"
 	done &
 
-	# Pipeline for old files
-	sed '1,/^separator$/d' "$BACKUP_FIFO" | while IFS="$NL" read f; do
+	# Operate on old files
+	sed '1,/^separator$/d' "$BACKUP_TMP".files | while IFS="$NL" read f; do
 		mv "$BACKUP_MAIN/$f$BACKUP_TIME_SEP$BACKUP_TIME_NOW" "$BACKUP_MAIN/$f$BACKUP_TIME_SEP$BACKUP_TIME"
 	done &
 
 	# wait for background jobs to finish
 	wait
 
-	rm "$BACKUP_FIFO"
+	# clean up
+	rm "$BACKUP_TMP".sql "$BACKUP_TMP".files
 }
 
 ### RUN ###
 
 if command -v run_this >/dev/null; then
+	check_db
 	run_this
 else
 	compare
