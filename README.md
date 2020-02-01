@@ -73,7 +73,7 @@ It will create necessary dirs and sqlite database to hold information.
 Simple usage
 ------------
 
-To backup your `/home` directory every now and then, save this file into your
+To backup your `/home` directory every now and then, add this file into your
 crontab:
 
 	# Required config
@@ -89,11 +89,10 @@ Advanced usage
 --------------
 
 But what if you want to backup, say, your browser data every 5 minutes, and rest
-of your `$HOME` directory - only once an hour? Then use a file like this:
+of your `$HOME` directory - only once an hour? Then create a file called
+`local.sh` next to the `backup.sh`, with a contents like this:
 
-	#!/bin/busybox ash
-
-	export BACKUP_ROOT=/var/backups
+	BACKUP_ROOT=/var/backups
 
 	run_this()
 	{
@@ -104,21 +103,15 @@ of your `$HOME` directory - only once an hour? Then use a file like this:
 		run_rsync hourly home /home/lex
 	}
 
-	# Run backup operations
-	. backup.sh
-
-Note that in last line we _source_ instead of running this script - this way we
-can ensure that `backup.sh` script will see declared functions. Also note
-hashbang in first line - for performance reasons, `backup.sh` must be executed
-by busybox.
+And add just `backup.sh` to your crontab. It will _source_ the `local.sh` file,
+and execute the `run_this` function.
 
 ### Clean-up
 
-To ensure that 10% of disk space remains free, add these lines to the end of
-above file:
-
-	# delete old versions until at least 10% of disk space is free
-	clean.sh 10 %
+Before running above function, `backup.sh` will ensure that there is at least
+10% of free disk space by deleting old files. You can configure this by setting
+`BACKUP_CLEAN_VAL` and `BACKUP_CLEAN_ON` variables in `local.sh` (see their
+values in `config.sh`).
 
 ### Protecting against bit rot
 
