@@ -6,6 +6,7 @@
 # corresponding DB entry / file
 
 . "$(dirname "$0")/common.sh"
+acquire_lock
 
 if test "$1" = '--fix'; then
 	FIX=1

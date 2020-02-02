@@ -78,13 +78,16 @@ lock_available()
 	test ! "$(stat -c %N /proc/$pid/fd/200)" == "/proc/$pid/fd/200 -> $BACKUP_FLOCK" && { echo "process $pid has FD 200 not pointing to $BACKUP_FLOCK"; rm "$BACKUP_FLOCK"; return 0; }
 	return 1
 }
-if ! lock_available; then
-	test -z "$BACKUP_WAIT_FLOCK" && exit 200
-	while ! lock_available; do sleep 1; done
-fi
-# acquire lock
-exec 200>"$BACKUP_FLOCK"
-echo "$$">&200
+acquire_lock()
+{
+	if ! lock_available; then
+		test -z "$BACKUP_WAIT_FLOCK" && exit 200
+		while ! lock_available; do sleep 1; done
+	fi
+	# acquire lock
+	exec 200>"$BACKUP_FLOCK"
+	echo "$$">&200
+}
 
 check_db()
 {

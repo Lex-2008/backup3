@@ -4,6 +4,7 @@
 
 test -z "$BIN" && BIN="$(dirname "$0")"
 . "$BIN/common.sh"
+acquire_lock
 
 ### RSYNC ###
 
