@@ -7,7 +7,7 @@ export BACKUP_TIME_FORMAT="%F %T"
 export BACKUP_CONFIG="/dev/null"
 ./init.sh
 
-filename=" tricky _-'\"\$(touch GOTCHA)ы "
+filename=" tricky _-'\"\\|\$(touch GOTCHA)ы "
 # filename="simple"
 
 verify() {
