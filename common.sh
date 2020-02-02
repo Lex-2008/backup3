@@ -3,8 +3,9 @@
 #
 # Common stuff
 
-test -z "$BIN"            && BIN="$(dirname "$0")"
-test -f "$BIN/local.sh"   && . "$BIN/local.sh"
+test -z "$BACKUP_BIN"     && BACKUP_BIN="$(dirname "$0")"
+test -z "$BACKUP_CONFIG"  && BACKUP_CONFIG="$BACKUP_BIN/local.sh"
+test -f "$BACKUP_CONFIG"  && . "$BACKUP_CONFIG"
 
 test -z "$BACKUP_ROOT"    && exit 2
 

@@ -4,6 +4,7 @@ rm -rf test
 mkdir -p test/src/ignore test/src/use
 export BACKUP_ROOT="$PWD/test"
 export BACKUP_TIME_FORMAT="%F %T"
+export BACKUP_CONFIG="/dev/null"
 ./init.sh
 
 

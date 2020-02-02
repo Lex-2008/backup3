@@ -9,7 +9,7 @@ echo "### DATABASE ###"
 rm "$BACKUP_DB"
 
 echo "1: create"
-./init.sh --noindex
+$BACKUP_BIN/init.sh --noindex
 
 echo "2: fill files"
 my_find "$BACKUP_MAIN" . $BACKUP_FIND_FILTER -not -type d -name "*$BACKUP_TIME_SEP*" | sed -r "
@@ -66,7 +66,7 @@ echo "UPDATE history SET freq = CASE
 	END;" | $SQLITE
 
 echo "5: index"
-./init.sh --notable
+$BACKUP_BIN/init.sh --notable
 
 if test "$1" = "--current"; then
 	echo "### CURRENT ###"
@@ -96,6 +96,3 @@ my_find  "$BACKUP_CURRENT" . $BACKUP_FIND_FILTER -type d | sed -r "
 		ON CONFLICT(dirname, filename) WHERE freq = 0 DO UPDATE \\
 		SET inode='\\1';@
 	\$a END TRANSACTION;" | $SQLITE
-
-# release the lock
-rm "$BACKUP_FLOCK"

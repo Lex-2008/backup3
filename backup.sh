@@ -2,8 +2,8 @@
 #
 # Main backup script.
 
-test -z "$BIN" && BIN="$(dirname "$0")"
-. "$BIN/common.sh"
+test -z "$BACKUP_BIN" && BACKUP_BIN="$(dirname "$0")"
+. "$BACKUP_BIN/common.sh"
 acquire_lock
 
 ### RSYNC ###
@@ -180,7 +180,7 @@ compare()
 
 check_db
 
-test "$BACKUP_CLEAN_ON" == 'pre' && . $BIN/clean.sh
+test "$BACKUP_CLEAN_ON" == 'pre' && . $BACKUP_BIN/clean.sh
 
 if command -v run_this >/dev/null; then
 	run_this
@@ -188,7 +188,7 @@ else
 	compare
 fi
 
-test "$BACKUP_CLEAN_ON" == 'post' && . $BIN/clean.sh
+test "$BACKUP_CLEAN_ON" == 'post' && . $BACKUP_BIN/clean.sh
 
 # release the lock
 rm "$BACKUP_FLOCK"
