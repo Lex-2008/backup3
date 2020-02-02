@@ -76,7 +76,7 @@ lock_available()
 	pid="$(cat "$BACKUP_FLOCK")"
 	test ! -d "/proc/$pid" && { rm "$BACKUP_FLOCK"; return 0; }
 	test ! -f "/proc/$pid/fd/200" && { echo "process $pid does not have FD 200"; rm "$BACKUP_FLOCK"; return 0; }
-	test ! "$(stat -c %N /proc/$pid/fd/200)" == "/proc/$pid/fd/200 -> $BACKUP_FLOCK" && { echo "process $pid has FD 200 not pointing to $BACKUP_FLOCK"; rm "$BACKUP_FLOCK"; return 0; }
+	expr "$(stat -c %N /proc/$pid/fd/200)" : "'\?/proc/$pid/fd/200'\? -> '\?$BACKUP_FLOCK'\?" >/dev/null || { echo "$0: process $pid ($(cat /proc/$pid/cmdline)) has FD 200 pointing to [$(stat -c %N /proc/$pid/fd/200)] - expected ['/proc/$pid/fd/200' -> '$BACKUP_FLOCK']"; rm "$BACKUP_FLOCK"; return 0; }
 	return 1
 }
 acquire_lock()
