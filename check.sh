@@ -101,7 +101,7 @@ db2old ()
 current2db ()
 {
 	test -n "$FIX" && echo "current2db: --fix is not supported"
-	my_find "$BACKUP_CURRENT" . -not -type d | sed -r "
+	my_find "$BACKUP_CURRENT" . -type f -o -type l | sed -r "
 	s/'/''/g
 	s_^([0-9]*) . (.*/)([^/]*)_	\\
 	SELECT CASE	\\
@@ -141,7 +141,7 @@ current2db_dirs ()
 old2db ()
 {
 	if test -n "$FIX"; then
-		my_find "$BACKUP_MAIN" . -not -type d -name "*$BACKUP_TIME_SEP$BACKUP_TIME_NOW" | sed -r "
+		my_find "$BACKUP_MAIN" . \( -type f -o -type l \) -name "*$BACKUP_TIME_SEP$BACKUP_TIME_NOW" | sed -r "
 		s/'/''/g;
 		1i BEGIN TRANSACTION;
 		s_^([0-9]*) . (.*/)([^/]*)/([^/$BACKUP_TIME_SEP]*)$BACKUP_TIME_SEP([^/$BACKUP_TIME_SEP]*)\$_	\\
@@ -161,7 +161,7 @@ old2db ()
 		  \$a END TRANSACTION;
 		" | $SQLITE
 	else
-		my_find "$BACKUP_MAIN" . -not -type d -name "*$BACKUP_TIME_SEP$BACKUP_TIME_NOW" | sed -r "
+		my_find "$BACKUP_MAIN" . \( -type f -o -type l \) -name "*$BACKUP_TIME_SEP$BACKUP_TIME_NOW" | sed -r "
 		s/'/''/g;
 		s_^([0-9]*) . (.*/)([^/]*)/([^/$BACKUP_TIME_SEP]*)$BACKUP_TIME_SEP([^/$BACKUP_TIME_SEP]*)\$_	\\
 		SELECT CASE WHEN EXISTS	\\
@@ -183,7 +183,7 @@ old2db ()
 old2current ()
 {
 	cd "$BACKUP_MAIN"
-	find . -not -type d -name "*$BACKUP_TIME_SEP$BACKUP_TIME_NOW" | while IFS="$NL" read f; do
+	find . \( -type f -o -type l \) -name "*$BACKUP_TIME_SEP$BACKUP_TIME_NOW" | while IFS="$NL" read f; do
 				# $f points to the file in data dir - i.e. it's like this:
 				# dirname/filename/created~now
 				filename="${f%/*}"
@@ -200,7 +200,7 @@ old2current ()
 
 current2old ()
 {
-	my_find "$BACKUP_CURRENT" . -not -type d | sed -r 's/^([0-9]*) . (.*)/\1|\2/' | while IFS="$NL" read f; do
+	my_find "$BACKUP_CURRENT" . -type f -o -type l | sed -r 's/^([0-9]*) . (.*)/\1|\2/' | while IFS="$NL" read f; do
 		inode="${f%%|*}"
 		fullname="${f##*|}"
 		ls -i "$BACKUP_MAIN/$fullname" 2>/dev/null | grep -q "^ *$inode " || echo "$fullname"

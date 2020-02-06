@@ -3,16 +3,17 @@ Style
 
 Use pipes and while loops, like this:
 
-	NL="
-	"
 	echo "$sql" | $SQLITE | while IFS="$NL" read f; do
 		# operate on "$f"
-	done | $SQLITE
+	done > "$BACKUP_TMP".sql
+	<"$BACKUP_TMP".sql | $SQLITE
+	rm "$BACKUP_TMP".sql
 
 Note `IFS="$NL"` before `read`!
 
 Note that some implementations of $SQLITE don't support receiving sql expression
-as an argument (most notably, "remote SQLite"), hence please avoid using it.
+as an argument or running two instances in parallel (most notably, "remote
+SQLite"), hence please avoid using it.
 
 To select filenames:
 
@@ -34,7 +35,7 @@ output.
 
 To parse filenames in `$BACKUP_MAIN`:
 
-	my_find "$BACKUP_MAIN" . $BACKUP_FIND_FILTER -not -type d | sed -r "
+	my_find "$BACKUP_MAIN" . $BACKUP_FIND_FILTER \( -type f -o -type l \) -name "*$BACKUP_TIME_SEP*" | sed -r "
 		s_^([0-9]*) (.) (.*/)([^/]*)/(.*)$BACKUP_TIME_SEP(.*)$_	\\
 			inode=\\1	\\
 			type=\\2	\\

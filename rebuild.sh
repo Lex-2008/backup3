@@ -12,7 +12,7 @@ echo "1: create"
 $BACKUP_BIN/init.sh --noindex
 
 echo "2: fill files"
-my_find "$BACKUP_MAIN" . $BACKUP_FIND_FILTER -not -type d -name "*$BACKUP_TIME_SEP*" | sed -r "
+my_find "$BACKUP_MAIN" . $BACKUP_FIND_FILTER \( -type f -o -type l \) -name "*$BACKUP_TIME_SEP*" | sed -r "
 	1i .timeout 10000
 	1i BEGIN TRANSACTION;
 	s/'/''/g        # duplicate single quotes
@@ -75,7 +75,7 @@ if test "$1" = "--current"; then
 
 	# note that this simply prints fiilenames so no need to use my_find
 	cd "$BACKUP_MAIN"
-	find . $BACKUP_FIND_FILTER -not -type d -name "*$BACKUP_TIME_SEP$BACKUP_TIME_NOW" | while IFS="$NL" read f; do
+	find . $BACKUP_FIND_FILTER \( -type f -o -type l \) -name "*$BACKUP_TIME_SEP$BACKUP_TIME_NOW" | while IFS="$NL" read f; do
 		fullname="$(dirname "$f")"
 		mkdir -p "$BACKUP_CURRENT/$(dirname "$fullname")"
 		ln "$BACKUP_MAIN/$f" "$BACKUP_CURRENT/$fullname"
