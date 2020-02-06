@@ -2,7 +2,7 @@
 #
 # Script to init DB.
 
-. "$(dirname "$0")/common.sh"
+. "${0%/*}/common.sh"
 acquire_lock
 
 mkdir -p $BACKUP_CURRENT $BACKUP_MAIN $BACKUP_RSYNC_LOGS

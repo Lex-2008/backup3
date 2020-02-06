@@ -2,7 +2,7 @@
 #
 # Rebuild database from files.
 
-. "$(dirname "$0")/common.sh"
+. "${0%/*}/common.sh"
 
 echo "### DATABASE ###"
 

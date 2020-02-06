@@ -8,7 +8,7 @@
 # Note that "./stuff/" should begin with "./" and end with "/", as dirname are
 # stored in DB, but "/tmp/dir" might be without trailing slash.
 
-. "$(dirname "$0")/common.sh"
+. "${0%/*}/common.sh"
 
 SHOW_DATE="$1"
 SHOW_DIR="$2"

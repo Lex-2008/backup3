@@ -3,7 +3,7 @@
 #
 # Common stuff
 
-test -z "$BACKUP_BIN"     && BACKUP_BIN="$(dirname "$0")"
+test -z "$BACKUP_BIN"     && BACKUP_BIN="${0%/*}"
 test -z "$BACKUP_CONFIG"  && BACKUP_CONFIG="$BACKUP_BIN/local.sh"
 test -f "$BACKUP_CONFIG"  && . "$BACKUP_CONFIG"
 

@@ -2,7 +2,7 @@
 #
 # Main backup script.
 
-test -z "$BACKUP_BIN" && BACKUP_BIN="$(dirname "$0")"
+test -z "$BACKUP_BIN" && BACKUP_BIN="${0%/*}"
 . "$BACKUP_BIN/common.sh"
 acquire_lock
 

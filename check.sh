@@ -5,7 +5,7 @@
 # Optional argument --fix to correct info
 # corresponding DB entry / file
 
-. "$(dirname "$0")/common.sh"
+. "${0%/*}/common.sh"
 acquire_lock
 
 if test "$1" = '--fix'; then
