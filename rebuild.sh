@@ -3,6 +3,7 @@
 # Rebuild database from files.
 
 . "${0%/*}/common.sh"
+acquire_lock
 
 echo "### DATABASE ###"
 
