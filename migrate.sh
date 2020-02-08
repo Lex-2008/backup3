@@ -29,6 +29,7 @@ while read dir; do
 	time="${dir%/}"
 	time="${time##*/}"
 	export BACKUP_TIME="$(date -d "$(echo "$time" | sed -r 's/_/ /;s/(.*)-(.*)-(.*)/\1:\2:\3/')" +"%F %H:%M")"
+	test -z "$BACKUP_TIME" && continue
 	echo "processing [$BACKUP_TIME] from [$dir]..."
 	mv "$dir" "$BACKUP_CURRENT/$DST"
 	~/backup3/backup.sh
