@@ -13,7 +13,7 @@
 
 if test "$1" = "--files"; then
 	shift
-	ls -d "$@" | sed -r 's_(.*)/(.*)_\1 \2_' | sort -k 2 | uniq -f 1 | sed -r 's_(.*) (.*)_\1/\2_'
+	echo "$@" | tr ' ' '\n' | sed -r 's_(.*)/(.*)_\1 \2_' | sort -k 2 | uniq -f 1 | sed -r 's_(.*) (.*)_\1/\2_'
 	exit 0
 fi
 
