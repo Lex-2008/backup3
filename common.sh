@@ -23,9 +23,10 @@ test -z "$BACKUP_TIMEOUT" && BACKUP_TIMEOUT="3600" # 1h
 test -z "$BACKUP_TIME_SEP" && BACKUP_TIME_SEP="~" # must be regexp-safe
 test -z "$BACKUP_TIME_NOW" && BACKUP_TIME_NOW=now # must be 'now' or valid date in future
 test -z "$BACKUP_MAX_FREQ" && BACKUP_MAX_FREQ=8640
-test -z "$BACKUP_CLEAN_ON" && BACKUP_CLEAN_ON=pre # 'pre', 'post', or 'none'
+test -z "$BACKUP_CLEAN_ON" && BACKUP_CLEAN_ON=post # 'pre', 'post', or 'none'
 test -z "$BACKUP_CLEAN_VAL" && BACKUP_CLEAN_VAL="10"
 test -z "$BACKUP_CLEAN_VAR" && BACKUP_CLEAN_VAR="%" # '%' or 'G'
+test -z "$BACKUP_CLEAN_BY_FREQ" && BACKUP_CLEAN_BY_FREQ=1
 test -z "$SQLITE"         && SQLITE="sqlite3 $BACKUP_DB"
 
 test -z "$CLEAN_BY_FREQ"  && CLEAN_BY_FREQ="1" # set to 0 to ignore freq when cleaning

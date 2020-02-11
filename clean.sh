@@ -24,11 +24,13 @@ check_space()
 
 check_space || return 0 # no cleanup needed
 
-if test "$CLEAN_BY_FREQ" = "1"; then
+if test "$BACKUP_CLEAN_BY_FREQ" = "1"; then
 	# Uses 'timeline' index to get rows with freq!=0, then builds a temporary index for age.
 	# We can't have this index permanently, since it depends on _current_ time
+	# '+1' is here for files deleted "right now" - otherwise, for them
+	# (strftime('now') - strftime(deleted)) equals 0 and they are immune to cleaning
 	sql="SELECT dirname || filename || '/' || created,
-			freq*(strftime('%s', 'now')-strftime('%s', deleted)) AS age,
+			freq*(strftime('%s', 'now', 'localtime')+1-strftime('%s', deleted)) AS age,
 			rowid
 		FROM history
 		WHERE freq != 0
@@ -61,6 +63,6 @@ echo "$sql" | $SQLITE | (
 	echo 'PRAGMA optimize;'
 ) > "$BACKUP_TMP".sql
 
-<"$BACKUP_TMP".sql | $SQLITE
+<"$BACKUP_TMP".sql $SQLITE
 
 rm "$BACKUP_TMP".sql
