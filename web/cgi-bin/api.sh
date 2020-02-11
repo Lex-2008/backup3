@@ -1,16 +1,7 @@
 #!/bin/busybox ash
 
-test -z "$BACKUP_ROOT"    && exit 2
-
-test -z "$BACKUP_CURRENT" && BACKUP_CURRENT=$BACKUP_ROOT/current
-test -z "$BACKUP_MAIN"    && BACKUP_MAIN=$BACKUP_ROOT/data
-test -z "$BACKUP_SHOW"    && BACKUP_SHOW=$BACKUP_ROOT/show
-test -z "$BACKUP_PASS"    && BACKUP_PASS=$BACKUP_ROOT/pass.txt
-test -z "$BACKUP_DB"      && BACKUP_DB=$BACKUP_ROOT/backup.db
-test -z "$BACKUP_TIME_SEP" && BACKUP_TIME_SEP="~"
-test -z "$BACKUP_TIME_NOW" && BACKUP_TIME_NOW=now
-test -z "$BACKUP_MAX_FREQ" && BACKUP_MAX_FREQ=8640
-test -z "$SQLITE"         && SQLITE="sqlite3 $BACKUP_DB"
+test -z "$BACKUP_BIN" && BACKUP_BIN=../..
+. "../../common.sh"
 
 # init # doesn't return anything, just creates index
 #       ls|dir|date
