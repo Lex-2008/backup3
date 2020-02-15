@@ -85,15 +85,20 @@ if test "$1" = "--current"; then
 fi
 
 echo "6: update dir inodes"
+echo '' | $SQLITE
 min_date="$(echo 'SELECT min(created) FROM history;' | $SQLITE)"
 echo "min_date=$min_date"
 my_find  "$BACKUP_CURRENT" . $BACKUP_FIND_FILTER -type d | sed -r "
 	1i .timeout 10000
 	1i BEGIN TRANSACTION;
+	1i CREATE UNIQUE INDEX dirs ON history(dirname, filename) WHERE type='d';
 	s/'/''/g        # duplicate single quotes
 	s@^([0-9]*) . (.*/)([^/]*)@	\\
 		INSERT INTO history (inode, type, dirname, filename, created, deleted, freq) VALUES	\\
-		('\\1', 'd', '\\2', '\\3', '$min_date', 'now', 0)	\\
-		ON CONFLICT(dirname, filename) WHERE freq = 0 DO UPDATE \\
-		SET inode='\\1';@
+		('\\1', 'd', '\\2', '\\3', '$min_date', '$BACKUP_TIME_NOW', 0)	\\
+		ON CONFLICT(dirname, filename) WHERE type='d' DO UPDATE \\
+		SET inode='\\1',	\\
+		    deleted='$BACKUP_TIME_NOW',	\\
+		    freq=0;@
+	\$a DROP INDEX dirs;
 	\$a END TRANSACTION;" | $SQLITE
