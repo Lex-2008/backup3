@@ -26,9 +26,9 @@ run_rsync()
 	# test if we need to run it at all - or not enough time had passed
 	test "$(date -r "$logfile" +"$date_fmt" 2>/dev/null)" = "$(date -d "$BACKUP_TIME" +"$date_fmt")" && return 0
 	# test if we can connect
-	test -d "$from" || timeout rsync "$@" "$from" >/dev/null 2>&1 || return 0
+	test -d "$from" || timeout rsync "$@" $RSYNC_EXTRA "$from" >/dev/null 2>&1 || return 0
 	# sync files
-	timeout -t "$BACKUP_TIMEOUT" rsync -a --itemize-changes --stats --delete --one-file-system "$@" "$from" "$BACKUP_CURRENT/$to" >"$logfile"
+	timeout -t "$BACKUP_TIMEOUT" rsync -a --itemize-changes --stats --delete --one-file-system "$@" $RSYNC_EXTRA "$from" "$BACKUP_CURRENT/$to" >"$logfile"
 	# add them to DB
 	compare "$to"
 }
