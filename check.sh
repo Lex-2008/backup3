@@ -33,7 +33,7 @@ db2current ()
 			while IFS="$NL" read f; do
 				filename="${f%%|*}"
 				rowid="${f##*|}"
-				if ! test -f "$BACKUP_CURRENT/$filename" -o -L "$BACKUP_CURRENT/$filename"; then
+				if test -e "$BACKUP_CURRENT/$filename" -a ! -d "$BACKUP_CURRENT/$filename"; then
 					echo "$BACKUP_CURRENT/$filename" >>check.db2current
 					test -n "$FIX" && echo "DELETE FROM history WHERE rowid='$rowid';"
 				fi
@@ -66,19 +66,6 @@ db2current_dirs ()
 
 db2old ()
 {
-	cmd="	echo '.timeout 10000'
-		echo 'BEGIN TRANSACTION;'
-		while test \$# -ge 1; do
-			filename=\"\${1%%|*}\"
-			rowid=\"\${1##*|}\"
-			if ! test -f \"$BACKUP_MAIN/\$filename\" -o -L \"$BACKUP_MAIN/\$filename\"; then
-				echo \"$BACKUP_MAIN/\$filename\" >>check.db2old
-				test -n \"$FIX\" && echo \"DELETE FROM history WHERE rowid='\$rowid';\"
-			fi
-			shift
-		done
-		echo 'END TRANSACTION;'
-		"
 	echo "SELECT dirname || filename || '/' || created || '$BACKUP_TIME_SEP' || deleted,
 			rowid
 		FROM history
@@ -89,7 +76,7 @@ db2old ()
 			while IFS="$NL" read f; do
 				filename="${f%%|*}"
 				rowid="${f##*|}"
-				if ! test -f "$BACKUP_MAIN/$filename" -o -L "$BACKUP_MAIN/$filename"; then
+				if test -e "$BACKUP_MAIN/$filename" -a ! -d "$BACKUP_MAIN/$filename"; then
 					echo "$BACKUP_MAIN/$filename" >>check.db2old
 					test -n "$FIX" && echo "DELETE FROM history WHERE rowid='$rowid';"
 				fi
@@ -188,10 +175,10 @@ old2current ()
 				# dirname/filename/created~now
 				filename="${f%/*}"
 				if ! test -f "$BACKUP_CURRENT/$filename" -o -L "$BACKUP_CURRENT/$filename"; then
-					echo "ln $BACKUP_MAIN/$1 => $BACKUP_CURRENT/$filename"
+					echo "ln $BACKUP_MAIN/$f => $BACKUP_CURRENT/$filename"
 					if test -n "$FIX"; then
 						mkdir -p "$BACKUP_CURRENT/${filename%/*}"
-						ln "$BACKUP_MAIN/$1" "$BACKUP_CURRENT/$filename"
+						ln "$BACKUP_MAIN/$f" "$BACKUP_CURRENT/$filename"
 					fi
 				fi
 			done
@@ -259,17 +246,11 @@ db_overlaps ()
 
 db_order ()
 {
-	cmd="	while test \$# -ge 1; do
-			echo rm \"$BACKUP_MAIN/\$1\"
-			test -n \"$FIX\" && rm \"$BACKUP_MAIN/\$1\"
-			shift
-		done
-		"
 	echo "SELECT dirname || filename || '/' || created || '$BACKUP_TIME_SEP' || deleted
 		FROM history
 		WHERE created >= deleted;" | $SQLITE | while IFS="$NL" read f; do
-			echo rm "$BACKUP_MAIN/$1" >>check.db_order
-			test -n "$FIX" && rm "$BACKUP_MAIN/$1"
+			echo rm "$BACKUP_MAIN/$f" >>check.db_order
+			test -n "$FIX" && rm "$BACKUP_MAIN/$f"
 		done
 }
 
@@ -339,7 +320,7 @@ db_freq ()
 		     THEN $BACKUP_MAX_FREQ -- crosses BACKUP_MAX_FREQ boundary (usually 5 minutes)
 		ELSE 2592000 / (strftime('%s', deleted) - strftime('%s', created))
 		     -- 2592000 is number of seconds per month
-	END;" | $SQLITE
+	END;" | $SQLITE >check.db_freq
 }
 
 check () {
