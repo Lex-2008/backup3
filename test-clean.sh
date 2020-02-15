@@ -1,4 +1,4 @@
-#!/bin/busybox ash
+#!/bin/bash
 
 if [ "$EUID" -ne 0 ]; then
 	echo "Please run as root"
@@ -10,7 +10,7 @@ rm -rf test
 mkdir test
 
 dd if=/dev/zero of=test/img count=0 bs=1M seek=10 2>/dev/null
-mkfs.ext4 test/img >/dev/null
+yes | mkfs.ext4 -q test/img >/dev/null
 mkdir test/fs
 mount test/img test/fs
 
