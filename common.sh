@@ -8,6 +8,7 @@ test -z "$BACKUP_CONFIG"  && BACKUP_CONFIG="$BACKUP_BIN/local.sh"
 test -f "$BACKUP_CONFIG"  && . "$BACKUP_CONFIG"
 
 test -z "$BACKUP_ROOT"    && exit 2
+test -d "$BACKUP_ROOT"    || exit 3
 
 test -z "$BACKUP_CURRENT" && BACKUP_CURRENT=$BACKUP_ROOT/current
 test -z "$BACKUP_FLOCK"   && BACKUP_FLOCK=$BACKUP_ROOT/lock
