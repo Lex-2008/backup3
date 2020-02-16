@@ -74,7 +74,7 @@ function sortedInsert(array, value) {
 }
 
 pad=(n)=>(n<10)?'0'+n:n;
-date2str=(day)=>day.getFullYear()+'-'+pad(day.getMonth()+1)+'-'+pad(day.getDay())+' '+pad(day.getHours())+':'+pad(day.getMinutes())+':'+pad(day.getSeconds());
+date2str=(day)=>day.getFullYear()+'-'+pad(day.getMonth()+1)+'-'+pad(day.getDate())+' '+pad(day.getHours())+':'+pad(day.getMinutes())+':'+pad(day.getSeconds());
 
 // helper function for the next one
 fillFreqtimes=(freqtimes, ticks, date, n, inc)=>{
