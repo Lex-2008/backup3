@@ -1,14 +1,24 @@
 #!/bin/busybox ash
 
 test -z "$BACKUP_BIN" && BACKUP_BIN=../..
-. "../../common.sh"
+. "$BACKUP_BIN/common.sh"
 
+# sync # doesn't return anything, just triggers backup.sh run
 # init # doesn't return anything, just creates index
 #       ls|dir|date
 # timeline|dir
 #      tar|dir|date
 #      get|dir|date|file
 #       ll|dir|*|file
+
+if test "$QUERY_STRING" = "sync"; then
+	echo "HTTP/1.0 200 OK"
+	echo "Cache-Control: max-age=600"
+	echo
+	"$BACKUP_BIN/backup.sh" &
+	exit 0
+fi
+
 
 if test "$QUERY_STRING" = "|init"; then
 	echo "HTTP/1.0 200 OK"
@@ -105,8 +115,8 @@ case "$request" in
 		echo "HTTP/1.0 200 OK"
 		echo "Cache-Control: max-age=3600"
 		echo "Content-Disposition: attachment; filename=\"$(basename "$filename").tar\""
+		"$BACKUP_BIN/show.sh" "$date" "$dir" "$BACKUP_SHOW"
 		# https://lists.gnu.org/archive/html/bug-tar/2007-01/msg00013.html
-		../../show.sh "$date" "$dir" "$BACKUP_SHOW"
 		echo -n "Content-Length: "
 		/bin/tar --create --ignore-failed-read --one-file-system --preserve-permissions --sparse -C "$BACKUP_SHOW/$dir/.." "$filename" --totals --file=/dev/null 2>&1 | sed '/Total bytes written/!d;s/.*: \([0-9]*\) (.*/\1/'
 		echo
