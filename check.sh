@@ -26,37 +26,14 @@ db2current ()
 			rowid
 		FROM history
 		WHERE freq = 0
-		  AND type != 'd'
 		ORDER BY dirname;" | $SQLITE | (
 			echo '.timeout 10000'
 			echo 'BEGIN TRANSACTION;'
 			while IFS="$NL" read f; do
 				filename="${f%%|*}"
 				rowid="${f##*|}"
-				if test -e "$BACKUP_CURRENT/$filename" -a ! -d "$BACKUP_CURRENT/$filename"; then
+				if ! test -e "$BACKUP_CURRENT/$filename" -o -L "$BACKUP_CURRENT/$filename"; then
 					echo "$BACKUP_CURRENT/$filename" >>check.db2current
-					test -n "$FIX" && echo "DELETE FROM history WHERE rowid='$rowid';"
-				fi
-			done
-			echo 'END TRANSACTION;'
-			) | $SQLITE
-}
-
-db2current_dirs ()
-{
-	echo "SELECT dirname || filename,
-			rowid
-		FROM history
-		WHERE freq = 0
-		  AND type = 'd'
-		ORDER BY dirname;" | $SQLITE | (
-			echo '.timeout 10000'
-			echo 'BEGIN TRANSACTION;'
-			while IFS="$NL" read f; do
-				filename="${f%%|*}"
-				rowid="${f##*|}"
-				if ! test -d "$BACKUP_CURRENT/$filename"; then
-					echo "$BACKUP_CURRENT/$filename" >>check.db2current_dirs
 					test -n "$FIX" && echo "DELETE FROM history WHERE rowid='$rowid';"
 				fi
 			done
@@ -76,7 +53,7 @@ db2old ()
 			while IFS="$NL" read f; do
 				filename="${f%%|*}"
 				rowid="${f##*|}"
-				if test -e "$BACKUP_MAIN/$filename" -a ! -d "$BACKUP_MAIN/$filename"; then
+				if ! test -e "$BACKUP_MAIN/$filename" -o -L "$BACKUP_MAIN/$filename"; then
 					echo "$BACKUP_MAIN/$filename" >>check.db2old
 					test -n "$FIX" && echo "DELETE FROM history WHERE rowid='$rowid';"
 				fi
@@ -88,7 +65,7 @@ db2old ()
 current2db ()
 {
 	test -n "$FIX" && echo "current2db: --fix is not supported"
-	my_find "$BACKUP_CURRENT" . -type f -o -type l | sed -r "
+	my_find "$BACKUP_CURRENT" . | sed -r "
 	s/'/''/g
 	s_^([0-9]*) . (.*/)([^/]*)_	\\
 	SELECT CASE	\\
@@ -99,30 +76,9 @@ current2db ()
 			AND dirname='\\2'	\\
 			AND filename='\\3'	\\
 			AND freq=0	\\
-			AND type != 'd'	\\
 			LIMIT 1	\\
 		) THEN 1	\\
 		ELSE '\\2\\3' END;_" | $SQLITE | fgrep -v -x 1 >"$BACKUP_ROOT/check.current2db"
-}
-
-current2db_dirs ()
-{
-	test -n "$FIX" && echo "current2db_dirs: --fix is not supported"
-	my_find "$BACKUP_CURRENT" . -type d | sed -r "
-	s/'/''/g
-	s_^([0-9]*) . (.*/)([^/]*)_	\\
-	SELECT CASE	\\
-		WHEN EXISTS(	\\
-			SELECT 1	\\
-			FROM history	\\
-			WHERE inode='\\1'	\\
-			AND dirname='\\2'	\\
-			AND filename='\\3'	\\
-			AND freq=0	\\
-			AND type = 'd'	\\
-			LIMIT 1	\\
-		) THEN 1	\\
-		ELSE '\\1|\\2|\\3' END;_" | $SQLITE | fgrep -v -x 1 >"$BACKUP_ROOT/check.current2db_dirs"
 }
 
 old2db ()
@@ -347,7 +303,6 @@ check db_order
 
 # Tests that might delete some DB rows
 check db2current
-check db2current_dirs
 check db2old
 check db_dups_created
 
@@ -362,7 +317,6 @@ check db_freq
 
 # Tests that remove files from files.txt
 check current2db
-check current2db_dirs
 check current2old
 
 # This test should never fail
