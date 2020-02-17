@@ -207,6 +207,47 @@ often, I recommend adding the following command to crontab to run every night:
 
 	$SQLITE "DROP INDEX IF EXISTS api;"
 
+### Remote trigger
+
+Instead of running by cron, it is also possible to trigger backup.sh run from a
+remote machine by sending HTTP request to `http://<webui>/cgi-bin/api.sh?sync`,
+where `http://<webui>/` is your WebUI endpoint. It can be useful, for example,
+when chaining different backup utilities to run one after another, or when a
+remote machine detects a change in a rarely-updated directory.
+
+If you want different things to happen when you run backup.sh by cron and by API
+trigger, you can check for `$GATEWAY_INTERFACE` environment variable in
+`local.sh`, like this:
+
+	# Common setup
+	BACKUP_ROOT=/var/backups
+
+	# things to sync by cron
+	cron_job()
+	{
+		run_rsync hourly homes /home
+		run_rsync always browser /home/lex/.config/google-chrome/Default/
+	}
+
+	# things to sync when triggered remotely
+	web_job()
+	{
+		run_rsync always remote "user@host::share"
+	}
+
+	# choose which of the above to run
+	if test -z "$GATEWAY_INTERFACE"; then
+		alias run_this=cron_job
+	else
+		BACKUP_WAIT_FLOCK=1
+		alias run_this=web_job
+	fi
+
+Also note `BACKUP_WAIT_FLOCK=1` statement above - it will ensure that if API
+gets triggered when a backup job is in progress - the script will wait for a
+blocking job to finish before issuing an api-initiated backup - and it will not
+be lost.
+
 Remote database
 ---------------
 
