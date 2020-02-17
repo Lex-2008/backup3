@@ -172,9 +172,16 @@ fetchTimeline=async(dir,all)=>{
 	// freqs is array of [freq, 'date', Date]
 	// Add a "dummy" freq with limiting date for the last freq
 	freqs.push([0,changes[changes.length-1]]);
-	// Now, loop through non-"dummy" freqs and fill result array
+	var must_sort=false;
 	var j=0;
+	// Now, loop through non-"dummy" freqs and fill result array
 	for(var i=0; i<freqs.length-1; i++) {
+		if(i==0 || freqs[i][1]<freqs[i-1][1]){
+			var j=0;
+			if(timeline.length>0){
+				must_sort=true;
+			}
+		}
 		var d=freqs[i][2];
 		ticks.push(date2str(d));
 		while(true){
@@ -187,6 +194,9 @@ fetchTimeline=async(dir,all)=>{
 		}
 	}
 	// TODO: check that we're still in this dir
+	if(must_sort){
+		timeline.sort();
+	}
 	timeline.push('current');
 	timeline_cache[all][dir]=timeline;
 	ticks_cache[all][dir]=ticks;
