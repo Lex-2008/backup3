@@ -290,16 +290,9 @@ Fun stuff
 		)
 	) | column -t
 
-### Getting number of files
+### Getting number of files in each directory
 
-	# In current backup
-	$SQLITE 'SELECT CASE instr(dirname, "/") WHEN 0 THEN dirname ELSE substr(dirname, 1, instr(dirname, "/")-1) END AS root, count(*) FROM history WHERE freq=0 GROUP BY root LIMIT 10;' | column -tns'|'
-
-	# Deleted
-	$SQLITE 'SELECT CASE instr(dirname, "/") WHEN 0 THEN dirname ELSE substr(dirname, 1, instr(dirname, "/")-1) END AS root, count(*) FROM history WHERE freq!=0 GROUP BY root LIMIT 10;' | column -tns'|'
-
-	# Total
-	$SQLITE 'SELECT CASE instr(dirname, "/") WHEN 0 THEN dirname ELSE substr(dirname, 1, instr(dirname, "/")-1) END AS root, count(*) FROM history GROUP BY root LIMIT 10;' | column -tns'|'
+	$SQLITE "SELECT substr(dirname,3,instr(substr(dirname,3),'/')-1) AS root, count(*) FROM history WHERE dirname != './' GROUP BY root; | column -tns'|'
 
 Note that `-n` argument for `column` command is a non-standard Debian extension
 
