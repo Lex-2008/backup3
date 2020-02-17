@@ -6,7 +6,7 @@
 .bar .view>div {-moz-columns: 2; columns: 2}
 .bar .view label {display: block}
 .bar .nav {flex-grow:1}
-.bar .nav input {width:100%; margin: 0px}
+.bar .nav #q {width:100%; margin: 0px}
 
 html {height:100%}
 .main {
@@ -39,6 +39,17 @@ html {height:100%}
 }
 .main a.file::before {
 	background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' enable-background='new 0 0 24 24' width='16' height='16'%3E %3Cpath d='M 3 0 L 3 24 L 21 24 L 21 8 L 21 7 L 14 0 L 13 0 L 3 0 z M 5 2 L 13 2 L 13 8 L 19 8 L 19 22 L 5 22 L 5 2 z'/%3E %3C/svg%3E");
+}
+
+/* https://feathericons.com/?query=alert-triangle
+ */
+.warn {
+	display:inline-block;
+	width: 16px;
+	height: 16px;
+	top: 3.5px;
+	position: relative;
+	background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='16' height='16' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E %3Cpath d='M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z'/%3E %3Cline x1='12' y1='9' x2='12' y2='13'/%3E %3Cline x1='12' y1='17' x2='12.01' y2='17'/%3E %3C/svg%3E");
 }
 
 .shade {
@@ -80,6 +91,11 @@ html {height:100%}
 	</fieldset>
 	<fieldset class="nav"><legend>Шкала времени</legend>
 		<input type="range" id="q" list="marks">
+		<label>
+			<input type="checkbox" id="show_questionable_times"/>
+			Показать все времена
+			<span class="warn" title="Некоторые времена могут содержать не все файлы"></span>
+		</label>
 	</fieldset>
 </div>
 <fieldset class="">

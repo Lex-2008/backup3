@@ -104,10 +104,10 @@ fillFreqtimes=(freqtimes, ticks, date, n, inc)=>{
 	}
 }
 
-timeline_cache={};
-ticks_cache={};
+timeline_cache={true:{},false:{}};
+ticks_cache={true:{},false:{}};
 
-fetchTimeline=async(dir)=>{
+fetchTimeline=async(dir,all)=>{
 	var a=await api(`timeline|${dir}`);
 	var data=a.split('\n').filter(a=>!!a);
 	var idx=data.indexOf('===');
@@ -155,14 +155,17 @@ fetchTimeline=async(dir)=>{
 			d.setMinutes(d.getMinutes()-d.getMinutes()%5);
 		}
 		// Part 2: Move 1 step forward
-		d['set'+prop[freqs[i][0]]](d['get'+prop[freqs[i][0]]]()+step[freqs[i][0]]);
-		// Explanation of the line above:
-		// freqs[i][0] is current freq
-		// prop[freqs[i][0]] is the property which we're changing ('Month')
-		// step[freqs[i][0]] is by how much (usually 1)
-		// 'set'+prop[freqs[i][0]] is this property setter
-		// So above line is:
-		// d['set'+'Month'](d['get'+'Month']()+1)
+		if(!all){
+			// console.log(freqs[i][0], 'DOING part 2');
+			d['set'+prop[freqs[i][0]]](d['get'+prop[freqs[i][0]]]()+step[freqs[i][0]]);
+			// Explanation of the line above:
+			// freqs[i][0] is current freq
+			// prop[freqs[i][0]] is the property which we're changing ('Month')
+			// step[freqs[i][0]] is by how much (usually 1)
+			// 'set'+prop[freqs[i][0]] is this property setter
+			// So above line is:
+			// d['set'+'Month'](d['get'+'Month']()+1)
+		}
 		freqs[i][1]=date2str(d);
 		freqs[i][2]=d;
 	}
@@ -185,17 +188,17 @@ fetchTimeline=async(dir)=>{
 	}
 	// TODO: check that we're still in this dir
 	timeline.push('current');
-	timeline_cache[dir]=timeline;
-	ticks_cache[dir]=ticks;
+	timeline_cache[all][dir]=timeline;
+	ticks_cache[all][dir]=ticks;
 }
 
 // fill timeline input (top right corner) and timeline global var
-fillTimeline=async(dir, current)=>{
+fillTimeline=async(dir, current, show_all)=>{
 	// TODO: timeline_timer
-	timeline=timeline_cache[dir];
-	ticks=ticks_cache[dir];
+	timeline=timeline_cache[show_all][dir];
+	ticks=ticks_cache[show_all][dir];
 	if(!timeline){
-		await fetchTimeline(dir);
+		await fetchTimeline(dir,show_all);
 	}
 	// TODO: this modifies timeline in cache, which is not nice
 	sortedInsert(timeline, current);
@@ -205,6 +208,9 @@ fillTimeline=async(dir, current)=>{
 	$('#q').value=timeline.indexOf(current);
 	$('#q').oninput=function(){
 		location.hash=`#${path}|${timeline[this.value]}`;
+	};
+	$('#show_questionable_times').onclick=function(){
+		fillTimeline(path,time,$('#show_questionable_times').checked);
 	};
 };
 
@@ -216,7 +222,7 @@ render=async()=>{
 			).join('/');
 
 	await ls(path,time);
-	/*await*/ fillTimeline(path,time);
+	/*await*/ fillTimeline(path,time,$('#show_questionable_times').checked);
 	if(!file){
 		$('#file_group').style.display='none';
 		return;
