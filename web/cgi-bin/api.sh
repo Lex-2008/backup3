@@ -11,7 +11,7 @@ test -z "$BACKUP_BIN" && BACKUP_BIN=../..
 #      get|dir|date|file
 #       ll|dir|*|file
 
-if test "$QUERY_STRING" = "sync"; then
+if expr "$QUERY_STRING" : "sync"; then
 	echo "HTTP/1.0 200 OK"
 	echo "Cache-Control: max-age=600"
 	echo
