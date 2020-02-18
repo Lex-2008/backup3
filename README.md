@@ -248,6 +248,19 @@ gets triggered when a backup job is in progress - the script will wait for a
 blocking job to finish before issuing an api-initiated backup - and it will not
 be lost.
 
+If you want to define several remote triggers, you can add anything after `sync`
+word in the URL, like this: `http://<webui>/cgi-bin/api.sh?sync-this`,
+`http://<webui>/cgi-bin/api.sh?sync-that`, and check `$QUERY_STRING` variable,
+like this:
+
+	if test "$QUERY_STRING" = "sync-this"; then
+		alias run_this=this_job
+	elif test "$QUERY_STRING" = "sync-that"; then
+		alias run_this=that_job
+	else
+		alias run_this=cron_job
+	fi
+
 Remote database
 ---------------
 
