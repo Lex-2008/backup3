@@ -88,8 +88,8 @@ old2db ()
 		s/'/''/g;
 		1i BEGIN TRANSACTION;
 		s_^([0-9]*) . (.*/)([^/]*)/([^/$BACKUP_TIME_SEP]*)$BACKUP_TIME_SEP([^/$BACKUP_TIME_SEP]*)\$_	\\
-			INSERT INTO history(inode, dirname, filename, created, deleted, freq)	\\
-			SELECT '\\1', '\\2', '\\3', '\\4', '\\5', 0	\\
+			INSERT INTO history(inode, dirname, filename, created, deleted)	\\
+			SELECT '\\1', '\\2', '\\3', '\\4', '\\5'	\\
 			WHERE NOT EXISTS (	\\
 				SELECT 1	\\
 				FROM history	\\
@@ -249,36 +249,6 @@ db_dups_freq0 ()
 			;" | $SQLITE >check.db_dups_freq0
 }
 
-db_freq ()
-{
-	if test -n "$FIX"; then
-		query="UPDATE history SET freq = CASE"
-	else
-		query="SELECT * FROM history WHERE freq != CASE"
-	fi
-	echo "$query
-		WHEN deleted = '$BACKUP_TIME_NOW'
-		     THEN 0 -- not deleted yet
-		WHEN strftime('%Y-%m', created, '-1 second') !=
-		     strftime('%Y-%m', deleted, '-1 second')
-		     THEN 1 -- different month
-		WHEN strftime('%Y %W', created, '-1 second') !=
-		     strftime('%Y %W', deleted, '-1 second')
-		     THEN 5 -- different week
-		WHEN strftime('%Y-%m-%d', created, '-1 second') !=
-		     strftime('%Y-%m-%d', deleted, '-1 second')
-		     THEN 30 -- different day
-		WHEN strftime('%Y-%m-%d %H', created, '-1 second') !=
-		     strftime('%Y-%m-%d %H', deleted, '-1 second')
-		     THEN 720 -- different hour
-		WHEN strftime('%s', created, '-1 second')/$BACKUP_MAX_FREQ_SEC !=
-		     strftime('%s', deleted, '-1 second')/$BACKUP_MAX_FREQ_SEC
-		     THEN $BACKUP_MAX_FREQ -- crosses BACKUP_MAX_FREQ boundary (usually 5 minutes)
-		ELSE 2592000 / (strftime('%s', deleted) - strftime('%s', created))
-		     -- 2592000 is number of seconds per month
-	END;" | $SQLITE >check.db_freq
-}
-
 check () {
 	test -n "$ONLY" -a "$ONLY" != "$1" && return
 	echo ===== $1 =====
@@ -306,14 +276,11 @@ check db2current
 check db2old
 check db_dups_created
 
-# Tests that might change created date (and invalidate freq)
+# Tests that might change created date
 check db_overlaps
 
-# Tests that might add new rows with wrong freq
+# Tests that might add new rows
 check old2db
-
-# Tests that fix freq according to created/deleted
-check db_freq
 
 # Tests that remove files from files.txt
 check current2db

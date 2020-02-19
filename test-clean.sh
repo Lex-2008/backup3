@@ -68,7 +68,7 @@ sleep 1
 rmfiles y $county
 mkfiles c $countc
 
-sqlite3 test/fs/backup.db 'update history set freq=1 where filename like "z%";'
+sqlite3 test/fs/backup.db "update history set created='2019-01-01 00:00:00' where filename like 'z%';"
 verify
 
 umount test/img

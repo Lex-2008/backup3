@@ -18,8 +18,8 @@ my_find "$BACKUP_MAIN" . $BACKUP_FIND_FILTER \( -type f -o -type l \) -name "*$B
 	1i BEGIN TRANSACTION;
 	s/'/''/g        # duplicate single quotes
 	s_^([0-9]*) (.) (.*/)([^/]*)/([^/$BACKUP_TIME_SEP]*)$BACKUP_TIME_SEP([^/$BACKUP_TIME_SEP]*)_	\\
-		INSERT INTO history (inode, type, dirname, filename, created, deleted, freq) VALUES	\\
-		('\\1', '\\2', '\\3', '\\4', '\\5', '\\6', 0);_
+		INSERT INTO history (inode, type, dirname, filename, created, deleted) VALUES	\\
+		('\\1', '\\2', '\\3', '\\4', '\\5', '\\6');_
 	\$a END TRANSACTION;" | $SQLITE
 
 echo "3: fill dirs"
@@ -37,36 +37,13 @@ echo "WITH RECURSIVE cte(org, parent, name, rest, pos, data1, data2) AS (
 	FROM cte
 	WHERE rest <> ''
 )
-INSERT INTO history (inode, type, dirname, filename, created, deleted, freq)
-SELECT 0, 'd', parent, name, min(data1), max(data2), 0
+INSERT INTO history (inode, type, dirname, filename, created, deleted)
+SELECT 0, 'd', parent, name, min(data1), max(data2)
 FROM cte
 WHERE pos <> 0
 GROUP BY parent, name;" | $SQLITE
 
-echo "4: update freq"
-echo "UPDATE history SET freq = CASE
-		WHEN deleted = '$BACKUP_TIME_NOW'
-		     THEN 0 -- not deleted yet
-		WHEN strftime('%Y-%m', created, '-1 second') !=
-		     strftime('%Y-%m', deleted, '-1 second')
-		     THEN 1 -- different month
-		WHEN strftime('%Y %W', created, '-1 second') !=
-		     strftime('%Y %W', deleted, '-1 second')
-		     THEN 5 -- different week
-		WHEN strftime('%Y-%m-%d', created, '-1 second') !=
-		     strftime('%Y-%m-%d', deleted, '-1 second')
-		     THEN 30 -- different day
-		WHEN strftime('%Y-%m-%d %H', created, '-1 second') !=
-		     strftime('%Y-%m-%d %H', deleted, '-1 second')
-		     THEN 720 -- different hour
-		WHEN strftime('%s', created, '-1 second')/$BACKUP_MAX_FREQ_SEC !=
-		     strftime('%s', deleted, '-1 second')/$BACKUP_MAX_FREQ_SEC
-		     THEN $BACKUP_MAX_FREQ -- crosses BACKUP_MAX_FREQ boundary (usually 5 minutes)
-		ELSE 2592000 / (strftime('%s', deleted) - strftime('%s', created))
-		     -- 2592000 is number of seconds per month
-	END;" | $SQLITE
-
-echo "5: index"
+echo "4: index"
 $BACKUP_BIN/init.sh --notable
 
 if test "$1" = "--current"; then
@@ -84,7 +61,7 @@ if test "$1" = "--current"; then
 	cd -> /dev/null
 fi
 
-echo "6: update dir inodes"
+echo "5: update dir inodes"
 echo '' | $SQLITE
 min_date="$(echo 'SELECT min(created) FROM history;' | $SQLITE)"
 echo "min_date=$min_date"
@@ -94,11 +71,10 @@ my_find  "$BACKUP_CURRENT" . $BACKUP_FIND_FILTER -type d | sed -r "
 	1i CREATE UNIQUE INDEX dirs ON history(dirname, filename) WHERE type='d';
 	s/'/''/g        # duplicate single quotes
 	s@^([0-9]*) . (.*/)([^/]*)@	\\
-		INSERT INTO history (inode, type, dirname, filename, created, deleted, freq) VALUES	\\
-		('\\1', 'd', '\\2', '\\3', '$min_date', '$BACKUP_TIME_NOW', 0)	\\
+		INSERT INTO history (inode, type, dirname, filename, created, deleted) VALUES	\\
+		('\\1', 'd', '\\2', '\\3', '$min_date', '$BACKUP_TIME_NOW')	\\
 		ON CONFLICT(dirname, filename) WHERE type='d' DO UPDATE \\
 		SET inode='\\1',	\\
-		    deleted='$BACKUP_TIME_NOW',	\\
-		    freq=0;@
+		    deleted='$BACKUP_TIME_NOW';@
 	\$a DROP INDEX dirs;
 	\$a END TRANSACTION;" | $SQLITE
