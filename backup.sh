@@ -28,7 +28,7 @@ run_rsync()
 	# test if we can connect
 	test -d "$from" || timeout rsync "$@" $RSYNC_EXTRA "$from" >/dev/null 2>&1 || return 0
 	# sync files
-	timeout -t "$BACKUP_TIMEOUT" rsync -a --itemize-changes --stats --delete --one-file-system "$@" $RSYNC_EXTRA "$from" "$BACKUP_CURRENT/$to" >"$logfile"
+	timeout -t "$BACKUP_TIMEOUT" rsync -a --itemize-changes --human-readable --stats --delete --one-file-system --partial-dir="$PARTIAL_DIR/$to" "$@" $RSYNC_EXTRA "$from" "$BACKUP_CURRENT/$to" >"$logfile"
 	# add them to DB
 	compare "$to"
 }
