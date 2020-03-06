@@ -77,7 +77,7 @@ echo "$sql" | $SQLITE | while IFS="$NL" read -r f; do
 			continue
 		fi
 		# check if file was renamed
-		target_filename="$(sed -r '/^Target:/!d;s/^Target: "(.*)" - missing.$/1/' "$BACKUP_PAR2_LOG")"
+		target_filename="$(sed -r '/^Target:/!d;s/^Target: "(.*)" - missing.$/\1/' "$BACKUP_PAR2_LOG")"
 		if test -z "$target_filename"; then
 			echo
 			echo PAR2 FAILED: "$filepart.par2" - no target_filename
