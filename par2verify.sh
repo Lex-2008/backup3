@@ -70,7 +70,7 @@ echo "$sql" | $SQLITE | while IFS="$NL" read -r f; do
 		par2verify -q "$filepart.par2" >"$BACKUP_PAR2_LOG" 2>&1 &
 		par_pid=$!
 		if test "$BACKUP_PAR2_CPULIMIT" != "0"; then
-			cpulimit -q -b -p $par_pid -l $BACKUP_PAR2_CPULIMIT
+			cpulimit -b -p $par_pid -l $BACKUP_PAR2_CPULIMIT >/dev/null 2>&1
 		fi
 		if wait $par_pid; then
 			echo -n p
@@ -91,7 +91,7 @@ echo "$sql" | $SQLITE | while IFS="$NL" read -r f; do
 		par2verify -qq "$filepart.par2" "$filename" &
 		par_pid=$!
 		if test "$BACKUP_PAR2_CPULIMIT" != "0"; then
-			cpulimit -q -b -p $par_pid -l $BACKUP_PAR2_CPULIMIT
+			cpulimit -b -p $par_pid -l $BACKUP_PAR2_CPULIMIT >/dev/null 2>&1
 		fi
 		if wait $par_pid; then
 			echo -n R
