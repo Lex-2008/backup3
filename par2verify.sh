@@ -88,7 +88,7 @@ echo "$sql" | $SQLITE | while IFS="$NL" read -r f; do
 		dirname="${filename%/*}"
 		target_filename="$dirname/$target_filename"
 		mv "$filename" "$target_filename"
-		par2verify -qq "$filepart.par2" "$filename" &
+		par2verify -qq "$filepart.par2" &
 		par_pid=$!
 		if test "$BACKUP_PAR2_CPULIMIT" != "0"; then
 			cpulimit -b -p $par_pid -l $BACKUP_PAR2_CPULIMIT >/dev/null 2>&1
