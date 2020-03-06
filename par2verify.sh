@@ -4,16 +4,23 @@
 #
 # Call it once a month like this:
 # 
-# $ par2verify.sh
+# $ par2verify.sh [-q]
 # (without arguments) to check all files in all monthly backups
 #
-# $ par2verify.sh 1
+# $ par2verify.sh [-q] 1
 # to check all files in last 1 monthly backups
 #
-# $ par2verify.sh 3 2
+# $ par2verify.sh [-q] 3 2
 # to check all files in backups which are older than 2 but newer than 3 months old
+#
+# Optional argument -q to be less verbose regarding missing files
 
 . "$(dirname "$0")/common.sh"
+
+if test "$1" = "-q"; then
+	be_quieter=1
+	shift
+fi
 
 cond2="AND created<strftime('%Y-%m', 'now')"
 if test ! -z "$1"; then
@@ -51,8 +58,12 @@ echo "$sql" | $SQLITE | while IFS="$NL" read -r f; do
 			continue
 		elif ! test -f "$filepart.par2"; then
 			# neither *.bak, nor *.par2 file found
-			echo
-			echo NOT PROTECTED: "$filename"
+			if test -z "$be_quieter"; then
+				echo
+				echo NOT PROTECTED: "$filename"
+			else
+				echo -n _
+			fi
 			continue
 		fi
 		# check *.par2 file
