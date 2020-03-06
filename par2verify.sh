@@ -26,75 +26,72 @@ fi
 sql=" SELECT dirname || filename || '/' || created,
 	'$BACKUP_TIME_SEP' || deleted
 	FROM history
-	WHERE freq<2 $cond1 $cond2
+	WHERE type='f'
+	  AND freq<2 $cond1 $cond2
 	ORDER BY dirname;"
 
-if test "$BACKUP_PAR2_CPULIMIT" = "0"; then
-	cpulimit_cmd=""
-else
-	cpulimit_cmd="cpulimit -q -b -p \$par_pid -l $BACKUP_PAR2_CPULIMIT"
-fi
-
-cmd="	while test \$# -ge 1; do
-		filepart=\"$BACKUP_MAIN/\${1%%|*}\"
-		fileend=\"\${1##*|}\"
-		filename=\"\$filepart\$fileend\"
-		if test -f \"\$filepart.bak\"; then
+export LC_ALL=POSIX
+echo "$sql" | $SQLITE | while IFS="$NL" read -r f; do
+		filepart="$BACKUP_MAIN/${f%%|*}"
+		fileend="${f##*|}"
+		filename="$filepart$fileend"
+		if test "$filename" -ef "$filepart.bak"; then
+			# *.bak file is hardlinked to original => remove
+			echo -n b
+			rm -f "$filepart.bak"
+		fi
+		if test -f "$filepart.bak"; then
 			# *.bak file found, check it
-			if diff -q \"\$filepart.bak\" \"\$filename\"; then
+			if diff -q "$filepart.bak" "$filename"; then
 				echo -n c
 			else
 				echo
-				echo FILES DIFFER: \"\$filepart.bak\" \"\$filename\"
+				echo FILES DIFFER: "$filepart.bak" "$filename"
 			fi
-			shift
 			continue
-		elif ! test -f \"\$filepart.par2\"; then
+		elif ! test -f "$filepart.par2"; then
 			# neither *.bak, nor *.par2 file found
 			echo
-			echo NOT PROTECTED: \"\$filename\"
-			shift
+			echo NOT PROTECTED: "$filename"
 			continue
 		fi
 		# check *.par2 file
-		par2verify -q \"\$filepart.par2\" >\"$BACKUP_PAR2_LOG\" 2>&1 &
-		par_pid=\$!
-		$cpulimit_cmd
-		if wait \$par_pid; then
+		par2verify -q "$filepart.par2" >"$BACKUP_PAR2_LOG" 2>&1 &
+		par_pid=$!
+		if test "$BACKUP_PAR2_CPULIMIT" != "0"; then
+			cpulimit -q -b -p $par_pid -l $BACKUP_PAR2_CPULIMIT
+		fi
+		if wait $par_pid; then
 			echo -n p
-			shift
 			continue
 		fi
 		# check if file was renamed
-		target_filename=\"\$(sed -r '/^Target:/!d;s/^Target: \"(.*)\" - missing.$/\\1/' \"$BACKUP_PAR2_LOG\")\"
-		if test -z \"\$target_filename\"; then
+		target_filename="$(sed -r '/^Target:/!d;s/^Target: "(.*)" - missing.$/1/' "$BACKUP_PAR2_LOG")"
+		if test -z "$target_filename"; then
 			echo
-			echo PAR2 FAILED: \"\$filepart.par2\" - no target_filename
-			cat \"$BACKUP_PAR2_LOG\"
-			shift
+			echo PAR2 FAILED: "$filepart.par2" - no target_filename
+			cat "$BACKUP_PAR2_LOG"
 			continue
 		fi
 		# rename file and repeat par2verify run
-		dirname=\"\${filename%/*}\"
-		target_filename=\"\$dirname/\$target_filename\"
-		mv \"\$filename\" \"\$target_filename\"
-		par2verify -qq \"\$filepart.par2\" \"\$filename\" &
-		par_pid=\$!
-		$cpulimit_cmd
-		if wait \$par_pid; then
+		dirname="${filename%/*}"
+		target_filename="$dirname/$target_filename"
+		mv "$filename" "$target_filename"
+		par2verify -qq "$filepart.par2" "$filename" &
+		par_pid=$!
+		if test "$BACKUP_PAR2_CPULIMIT" != "0"; then
+			cpulimit -q -b -p $par_pid -l $BACKUP_PAR2_CPULIMIT
+		fi
+		if wait $par_pid; then
 			echo -n R
-			# note that we can't shift and continue here, because
+			# note that we can't continue here, because
 			# we should rename file back to original
 		else
 			echo
-			echo PAR2 FAILED: \"\$filepart.par2\"
-			# rm -f \"\$filepart.par2\" \"\$filepart.vol\"*
+			echo PAR2 FAILED: "$filepart.par2"
+			# rm -f "$filepart.par2" "$filepart.vol"*
 		fi
 		# rename file back to original
-		mv \"\$target_filename\" \"\$filename\"
-		shift
+		mv "$target_filename" "$filename"
 	done
-	"
 
-export LC_ALL=POSIX
-echo "$sql" | $SQLITE | tr '\n' '\0' | xargs -0 sh -c "$cmd" x

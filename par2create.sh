@@ -28,20 +28,15 @@ fi
 
 sql=" SELECT dirname || filename || '/' || created || '$BACKUP_TIME_SEP' || deleted
 	FROM history
-	WHERE freq<2 $cond1 $cond2
+	WHERE type='f'
+	  AND freq<2 $cond1 $cond2
 	ORDER BY dirname;"
 
-if test "$BACKUP_PAR2_CPULIMIT" = "0"; then
-	cpulimit_cmd="wait \$par_pid"
-else
-	cpulimit_cmd="cpulimit -p \$par_pid -l $BACKUP_PAR2_CPULIMIT >/dev/null 2>&1"
-fi
-
-cmd="getfn() {
-	# helper function to get file name when it was renamed
-	filename=\"\$1\"
-	fileend=\"\${filename##*$BACKUP_TIME_SEP}\"
-	if test \"\$fileend\" != \"$BACKUP_TIME_SEP$BACKUP_TIME_NOW\"; then
+# helper function to get file name when it was renamed
+getfn() {
+	filename="$1"
+	fileend="${filename##*$BACKUP_TIME_SEP}"
+	if test "$fileend" != "$BACKUP_TIME_SEP$BACKUP_TIME_NOW"; then
 		# ERROR: file doesn't end with ~now
 		# it's an error because this function was called when requested
 		# file didn't exist. And the only way it could happen under
@@ -49,75 +44,87 @@ cmd="getfn() {
 		# while this script is running
 		return
 	fi
-	filepart=\"\${filename%$BACKUP_TIME_SEP*}\"
-	filename=\"\$(ls -1 \"\$filepart\"* )\"
-	if test -f \"\$filename\"; then
+	filepart="${filename%$BACKUP_TIME_SEP*}"
+	filename="$(ls -1 "$filepart"* )"
+	if test -f "$filename"; then
 		# single existing file matches filepart*
 		# hence it's a file we were looking for
-		echo \"\$filename\"
+		echo "$filename"
 		return
 	fi
-	count=\"\$(echo \"\$filename\" | wc -l)\"
-	if test \$count -gt 1; then
+	count="$(echo "$filename" | wc -l)"
+	if test $count -gt 1; then
 		# ERROR: more than one file matches
 		# it's an error since backup was checked before
 		return
 	fi
 	# getting filename by expanding * didn't work,
 	# trying 'ls | grep' method
-	partbase=\"\$(basename \"\$filepart\")$BACKUP_TIME_SEP\"
-	dirname=\"\$(dirname \"\$filepart\")\" 
-	basename=\"\$(ls -1 \"\$dirname\" | fgrep \"\$partbase\")\"
-	if test -z \"\$basename\"; then
+	partbase="$(basename "$filepart")$BACKUP_TIME_SEP"
+	dirname="$(dirname "$filepart")"
+	basename="$(ls -1 "$dirname" | fgrep "$partbase")"
+	if test -z "$basename"; then
 		# ERROR: nothing was found
 		return
 	fi
-	filename=\"\$dirname/\$basename\"
-	if test -f \"\$filename\"; then
+	filename="$dirname/$basename"
+	if test -f "$filename"; then
 		# single existing file was found
 		# hence it's a file we were looking for
-		echo \"\$filename\"
+		echo "$filename"
 		return
 	fi
 	# otherwise, ERROR
 }
 
-	while test \$# -ge 1; do
-		filename=\"$BACKUP_MAIN/\$1\"
-		filepart=\"\${filename%$BACKUP_TIME_SEP*}\"
-		if test -f \"\$filepart.par2\" -o -f \"\$filepart.bak\"; then
+finish_time="$(`which date` -d "$BACKUP_PAR2_TIMEOUT" +%s)"
+export LC_ALL=POSIX
+echo "$sql" | $SQLITE | while IFS="$NL" read -r f; do
+		if test "$(date +%s)" -gt "$finish_time"; then
+			# timeout reached, abort
+			echo
+			echo "TIMEOUT"
+			break
+		fi
+		filename="$BACKUP_MAIN/$f"
+		filepart="${filename%$BACKUP_TIME_SEP*}"
+		if test "$filename" -ef "$filepart.bak"; then
+			# *.bak file is hardlinked to original => remove
+			echo -n b
+			rm -f "$filepart.bak"
+		fi
+		if test -f "$filepart.par2" -o -f "$filepart.bak"; then
 			# backup already exists, moving on
 			echo -n .
-			shift
 			continue
 		fi
-		if test ! -f \"\$filename\"; then
+		if test ! -f "$filename"; then
 			# Maybe file was renamed while this script was running.
 			# Trying to get new filename
-			filename=\"\$(getfn \"\$filename\")\"
-			if test -z \"\$filename\"; then
+			filename="$(getfn "$filename")"
+			if test -z "$filename"; then
 				echo
-				echo \"ERROR: [\$filepart]\"
-				shift
+				echo "ERROR: [$filepart]"
 				continue
 			fi
 		fi
-		filesize=\"\$(stat -c%s \"\$filename\")\"
-		if test \"\$filesize\" -lt $BACKUP_PAR2_SIZELIMIT; then
+		filesize="$(stat -c%s "$filename")"
+		if test "$filesize" -lt $BACKUP_PAR2_SIZELIMIT; then
 			# small file - just copy it
 			echo -n C
-			cp \"\$filename\" \"\$filepart.bak\"
+			cp "$filename" "$filepart.bak"
 		else
 			# big file - par2create
 			echo -n P
-			par2create -qq -n1 \"\$filepart.par2\" \"\$filename\" >/dev/null &
-			par_pid=\$!
-			$cpulimit_cmd
+			par2create -qq -n1 "$filepart.par2" "$filename" >/dev/null &
+			par_pid=$!
+			if test "$BACKUP_PAR2_CPULIMIT" = "0"; then
+				wait $par_pid
+			else
+				cpulimit -p $par_pid -l $BACKUP_PAR2_CPULIMIT >/dev/null 2>&1
+			fi
+
 
 		fi
-		shift
 	done
-	"
 
-export LC_ALL=POSIX
-echo "$sql" | $SQLITE | tr '\n' '\0' | xargs -0 sh -c "$cmd" x
