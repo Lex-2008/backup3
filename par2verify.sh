@@ -52,8 +52,15 @@ sql=" SELECT dirname || filename || '/' || created,
 	  AND freq<2 $cond1 $cond2
 	ORDER BY $sort_by;"
 
+finish_time="$(`which date` -d "$BACKUP_PAR2_TIMEOUT" +%s)"
 export LC_ALL=POSIX
 echo "$sql" | $SQLITE | while IFS="$NL" read -r f; do
+		if test "$(date +%s)" -gt "$finish_time"; then
+			# timeout reached, abort
+			echo
+			echo "TIMEOUT"
+			break
+		fi
 		filepart="$BACKUP_MAIN/${f%%|*}"
 		fileend="${f##*|}"
 		filename="$filepart$fileend"
