@@ -4,22 +4,37 @@
 #
 # Call it once a month like this:
 # 
-# $ par2verify.sh [-q]
+# $ par2verify.sh [OPTIONS]
 # (without arguments) to check all files in all monthly backups
 #
-# $ par2verify.sh [-q] 1
+# $ par2verify.sh [OPTIONS] 1
 # to check all files in last 1 monthly backups
 #
-# $ par2verify.sh [-q] 3 2
+# $ par2verify.sh [OPTIONS] 3 2
 # to check all files in backups which are older than 2 but newer than 3 months old
 #
-# Optional argument -q to be less verbose regarding missing files
+# Options are:
+#   -q to be less verbose regarding missing files
+#   -qq to be less verbose regarding OK files (report only issues)
+#   -r to process files in random order
 
 . "$(dirname "$0")/common.sh"
 
 if test "$1" = "-q"; then
-	be_quieter=1
+	quiet_missing=1
 	shift
+fi
+
+if test "$1" = "-qq"; then
+	quiet_ok=1
+	shift
+fi
+
+if test "$1" = "-r"; then
+	sort_by="random()"
+	shift
+else
+	sort_by="dirname"
 fi
 
 cond2="AND created<strftime('%Y-%m', 'now')"
@@ -35,7 +50,7 @@ sql=" SELECT dirname || filename || '/' || created,
 	FROM history
 	WHERE type='f'
 	  AND freq<2 $cond1 $cond2
-	ORDER BY dirname;"
+	ORDER BY $sort_by;"
 
 export LC_ALL=POSIX
 echo "$sql" | $SQLITE | while IFS="$NL" read -r f; do
@@ -50,7 +65,7 @@ echo "$sql" | $SQLITE | while IFS="$NL" read -r f; do
 		if test -f "$filepart.bak"; then
 			# *.bak file found, check it
 			if diff -q "$filepart.bak" "$filename"; then
-				echo -n c
+				test -z "$quiet_ok" && echo -n c
 			else
 				echo
 				echo FILES DIFFER: "$filepart.bak" "$filename"
@@ -58,7 +73,7 @@ echo "$sql" | $SQLITE | while IFS="$NL" read -r f; do
 			continue
 		elif ! test -f "$filepart.par2"; then
 			# neither *.bak, nor *.par2 file found
-			if test -z "$be_quieter"; then
+			if test -z "$quiet_missing"; then
 				echo
 				echo NOT PROTECTED: "$filename"
 			else
@@ -73,7 +88,7 @@ echo "$sql" | $SQLITE | while IFS="$NL" read -r f; do
 			cpulimit -b -p $par_pid -l $BACKUP_PAR2_CPULIMIT >/dev/null 2>&1
 		fi
 		if wait $par_pid; then
-			echo -n p
+			test -z "$quiet_ok" && echo -n p
 			continue
 		fi
 		# check if file was renamed
@@ -94,7 +109,7 @@ echo "$sql" | $SQLITE | while IFS="$NL" read -r f; do
 			cpulimit -b -p $par_pid -l $BACKUP_PAR2_CPULIMIT >/dev/null 2>&1
 		fi
 		if wait $par_pid; then
-			echo -n R
+			test -z "$quiet_ok" && echo -n R
 			# note that we can't continue here, because
 			# we should rename file back to original
 		else

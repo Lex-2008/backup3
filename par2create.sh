@@ -5,18 +5,41 @@
 #
 # Call it once a month like this:
 # 
-# $ par2create.sh
+# $ par2create.sh [OPTIONS]
 # (without arguments) to create par2 archives (or duplicates) of all files in
 # all monthly backups
 #
-# $ par2create.sh 1
+# $ par2create.sh [OPTIONS] 1
 # to create par2 archives (or duplicates) of all files in last 1 monthly backups
 #
-# $ par2create.sh 3 2
+# $ par2create.sh [OPTIONS] 3 2
 # to create par2 archives (or duplicates) of all files in backups which are
 # older than 2 but newer than 3 months old
+#
+# Options are:
+#   -q to be less verbose regarding existing files (do not print dots)
+#   -qq to be less verbose regarding created files (report only issues)
+#   -r to process files in random order
 
 . "$(dirname "$0")/common.sh"
+
+if test "$1" = "-q"; then
+	quiet_existing=1
+	shift
+fi
+
+if test "$1" = "-qq"; then
+	quiet_existing=1
+	quiet_new=1
+	shift
+fi
+
+if test "$1" = "-r"; then
+	sort_by="random()"
+	shift
+else
+	sort_by="dirname"
+fi
 
 cond2="AND created<strftime('%Y-%m', 'now')"
 if test ! -z "$1"; then
@@ -30,7 +53,7 @@ sql=" SELECT dirname || filename || '/' || created || '$BACKUP_TIME_SEP' || dele
 	FROM history
 	WHERE type='f'
 	  AND freq<2 $cond1 $cond2
-	ORDER BY dirname;"
+	ORDER BY $sort_by;"
 
 # helper function to get file name when it was renamed
 getfn() {
@@ -95,7 +118,7 @@ echo "$sql" | $SQLITE | while IFS="$NL" read -r f; do
 		fi
 		if test -f "$filepart.par2" -o -f "$filepart.bak"; then
 			# backup already exists, moving on
-			echo -n .
+			test -z "$quiet_existing" && echo -n .
 			continue
 		fi
 		if test ! -f "$filename"; then
@@ -111,11 +134,11 @@ echo "$sql" | $SQLITE | while IFS="$NL" read -r f; do
 		filesize="$(stat -c%s "$filename")"
 		if test "$filesize" -lt $BACKUP_PAR2_SIZELIMIT; then
 			# small file - just copy it
-			echo -n C
+			test -z "$quiet_new" && echo -n C
 			cp "$filename" "$filepart.bak"
 		else
 			# big file - par2create
-			echo -n P
+			test -z "$quiet_new" && echo -n P
 			par2create -qq -n1 "$filepart.par2" "$filename" >/dev/null &
 			par_pid=$!
 			if test "$BACKUP_PAR2_CPULIMIT" = "0"; then
@@ -123,8 +146,6 @@ echo "$sql" | $SQLITE | while IFS="$NL" read -r f; do
 			else
 				cpulimit -p $par_pid -l $BACKUP_PAR2_CPULIMIT >/dev/null 2>&1
 			fi
-
-
 		fi
 	done
 
