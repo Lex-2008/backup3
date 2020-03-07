@@ -15,7 +15,12 @@ run_rsync()
 	to="$2"
 	from="$3"
 	shift 3
-	logfile="$BACKUP_RSYNC_LOGS/$to"
+	if test -z "$BACKUP_LOCAL_LOGS" ; then
+		logfile="$BACKUP_RSYNC_LOGS/$to.log"
+	else
+		logfile="$BACKUP_CURRENT/$to/$BACKUP_LOCAL_LOGS"
+		rsync_logfile_exclude="--exclude=$BACKUP_LOCAL_LOGS"
+	fi
 	case "$when" in
 		( hourly )	date_fmt="%F %H" ;;
 		( daily )	date_fmt="%F" ;;
@@ -28,7 +33,7 @@ run_rsync()
 	# test if we can connect
 	test -d "$from" || timeout rsync "$@" $RSYNC_EXTRA "$from" >/dev/null 2>&1 || return 0
 	# sync files
-	timeout -t "$BACKUP_TIMEOUT" rsync -a --itemize-changes --human-readable --stats --delete --one-file-system --partial-dir="$PARTIAL_DIR/$to" "$@" $RSYNC_EXTRA "$from" "$BACKUP_CURRENT/$to" >"$logfile"
+	timeout -t "$BACKUP_TIMEOUT" rsync -a --itemize-changes --human-readable --stats --delete --one-file-system --partial-dir="$PARTIAL_DIR/$to" "$rsync_logfile_exclude" "$@" $RSYNC_EXTRA "$from" "$BACKUP_CURRENT/$to" >"$logfile" 2>&1
 	# add them to DB
 	compare "$to"
 }
