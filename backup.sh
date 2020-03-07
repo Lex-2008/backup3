@@ -21,6 +21,7 @@ run_rsync()
 		logfile="$BACKUP_CURRENT/$to/$BACKUP_LOCAL_LOGS"
 		rsync_logfile_exclude="--exclude=$BACKUP_LOCAL_LOGS"
 	fi
+	statsfile="$BACKUP_RSYNC_STATS/$to.log"
 	case "$when" in
 		( hourly )	date_fmt="%F %H" ;;
 		( daily )	date_fmt="%F" ;;
@@ -36,6 +37,11 @@ run_rsync()
 	timeout -t "$BACKUP_TIMEOUT" rsync -a --itemize-changes --human-readable --stats --delete --one-file-system --partial-dir="$PARTIAL_DIR/$to" "$rsync_logfile_exclude" "$@" $RSYNC_EXTRA "$from" "$BACKUP_CURRENT/$to" >"$logfile" 2>&1
 	# add them to DB
 	compare "$to"
+	# create stats file if it doesn't exist
+	test -f "$statsfile" || ( echo "date"; sed '/Number of created files/,/^$/!d;s/: .*//' "$logfile" ) | tr '\n' '\t' >"$statsfile"
+	# summarise rsync stats
+	echo >>"$statsfile"
+	( echo "$BACKUP_TIME"; sed '/Number of created files/,/^$/!d;s/.*: //' "$logfile" ) | tr '\n' '\t' >>"$statsfile"
 }
 
 ### COMPARE ###

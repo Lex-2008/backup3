@@ -4,7 +4,7 @@
 
 . "${0%/*}/common.sh"
 
-mkdir -p $BACKUP_CURRENT $BACKUP_MAIN $BACKUP_RSYNC_LOGS
+mkdir -p $BACKUP_CURRENT $BACKUP_MAIN $BACKUP_RSYNC_LOGS $BACKUP_RSYNC_STATS
 
 test "$1" = "--notable" || echo "
 DROP TABLE IF EXISTS history;
