@@ -113,7 +113,7 @@ echo "$sql" | $SQLITE | while IFS="$NL" read -r f; do
 		filepart="${filename%$BACKUP_TIME_SEP*}"
 		if test "$filename" -ef "$filepart.bak"; then
 			# *.bak file is hardlinked to original => remove
-			echo -n b
+			echo -n x
 			rm -f "$filepart.bak"
 		fi
 		if test -f "$filepart.par2" -o -f "$filepart.bak"; then

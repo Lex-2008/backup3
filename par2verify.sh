@@ -66,7 +66,7 @@ echo "$sql" | $SQLITE | while IFS="$NL" read -r f; do
 		filename="$filepart$fileend"
 		if test "$filename" -ef "$filepart.bak"; then
 			# *.bak file is hardlinked to original => remove
-			echo -n b
+			echo -n x
 			rm -f "$filepart.bak"
 		fi
 		if test -f "$filepart.bak"; then
