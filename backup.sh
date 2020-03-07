@@ -41,7 +41,7 @@ run_rsync()
 	test -f "$statsfile" || ( echo "date"; sed '/Number of created files/,/^$/!d;s/: .*//' "$logfile" ) | tr '\n' '\t' >"$statsfile"
 	# summarise rsync stats
 	echo >>"$statsfile"
-	( echo "$BACKUP_TIME"; sed '/Number of created files/,/^$/!d;s/.*: //' "$logfile" ) | tr '\n' '\t' >>"$statsfile"
+	( echo "$BACKUP_TIME"; sed '/Number of created files/,/^$/!d;s/[^:]*: //' "$logfile" ) | tr '\n' '\t' >>"$statsfile"
 }
 
 ### COMPARE ###
