@@ -94,6 +94,12 @@ acquire_lock()
 	# acquire lock
 	exec 200>"$BACKUP_FLOCK"
 	echo "$$">&200
+	# check that we indeed got the lock
+	sleep 1
+	if test "$(cat "$BACKUP_FLOCK")" != "$$"; then
+		echo "lock was stolen from $$ by $(cat "$BACKUP_FLOCK"), retrying..."
+		acquire_lock
+	fi
 }
 
 check_db()
