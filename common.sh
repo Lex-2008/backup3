@@ -23,6 +23,7 @@ test -z "$BACKUP_FIND_FILTER" # this is fine
 test -z "$BACKUP_DB"      && BACKUP_DB=$BACKUP_ROOT/backup.db
 test -z "$BACKUP_TIME_FORMAT" && BACKUP_TIME_FORMAT="%F %H:%M"
 test -z "$BACKUP_TIME"    && BACKUP_TIME="$(date +"$BACKUP_TIME_FORMAT")"
+test -z "$BACKUP_SCAN_TIMEOUT" && BACKUP_SCAN_TIMEOUT="10" # 10 sec
 test -z "$BACKUP_TIMEOUT" && BACKUP_TIMEOUT="3600" # 1h
 test -z "$BACKUP_TIME_SEP" && BACKUP_TIME_SEP="~" # must be regexp-safe
 test -z "$BACKUP_TIME_NOW" && BACKUP_TIME_NOW=now # must be 'now' or valid date in future
@@ -45,6 +46,11 @@ test -z "$BACKUP_PAR2_LOG" && BACKUP_PAR2_LOG=$BACKUP_ROOT/par2.log
 # hence 2592000/BACKUP_MAX_FREQ is number of seconds / event
 # usually 300 seconds for BACKUP_MAX_FREQ=8640 (5 minutes)
 BACKUP_MAX_FREQ_SEC="$(echo "2592000 $BACKUP_MAX_FREQ / p" | dc)"
+
+if timeout --help 2>&1 | head -n1 | grep -q 'BusyBox v1.2'; then
+    # busybox before 1.30 required -t argument before time
+	  TIMEOUT_ARG='-t'
+fi
 
 NL="
 "
