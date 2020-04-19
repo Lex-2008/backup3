@@ -74,7 +74,7 @@ my_find()
 		     s_^([0-9]*) d .$_\1 d ./._
 		     t
 		     s/^([0-9]*) [^.]* /\1 s /'
-		find "$@" | while IFS="$NL" read f; do
+		find "$@" | while IFS="$NL" read -r f; do
 			stat -c '%i %F %n' "$f"
 		done | sed -r "$sed"
 	fi

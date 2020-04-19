@@ -143,13 +143,13 @@ compare()
 	<"$BACKUP_TMP".sql $SQLITE >"$BACKUP_TMP".files
 
 	# Operate on new files
-	sed '1d;/^separator$/,$d' "$BACKUP_TMP".files | while IFS="$NL" read f; do
+	sed '1d;/^separator$/,$d' "$BACKUP_TMP".files | while IFS="$NL" read -r f; do
 		mkdir -p "$BACKUP_MAIN/$f"
 		ln "$BACKUP_CURRENT/$f" "$BACKUP_MAIN/$f/$BACKUP_TIME$BACKUP_TIME_SEP$BACKUP_TIME_NOW"
 	done &
 
 	# Operate on old files
-	sed '1,/^separator$/d' "$BACKUP_TMP".files | while IFS="$NL" read f; do
+	sed '1,/^separator$/d' "$BACKUP_TMP".files | while IFS="$NL" read -r f; do
 		mv "$BACKUP_MAIN/$f$BACKUP_TIME_SEP$BACKUP_TIME_NOW" "$BACKUP_MAIN/$f$BACKUP_TIME_SEP$BACKUP_TIME"
 	done &
 

@@ -56,7 +56,7 @@ fi
 echo "$sql" | $SQLITE | (
 	echo '.timeout 10000'
 	echo 'BEGIN TRANSACTION;'
-	while IFS="$NL" read f; do
+	while IFS="$NL" read -r f; do
 		check_space || break
 		filename="${f%%|*}"
 		rowid="${f##*|}"

@@ -53,7 +53,7 @@ if test "$1" = "--current"; then
 
 	# note that this simply prints fiilenames so no need to use my_find
 	cd "$BACKUP_MAIN"
-	find . $BACKUP_FIND_FILTER \( -type f -o -type l \) -name "*$BACKUP_TIME_SEP$BACKUP_TIME_NOW" | while IFS="$NL" read f; do
+	find . $BACKUP_FIND_FILTER \( -type f -o -type l \) -name "*$BACKUP_TIME_SEP$BACKUP_TIME_NOW" | while IFS="$NL" read -r f; do
 		fullname="$(dirname "$f")"
 		mkdir -p "$BACKUP_CURRENT/$(dirname "$fullname")"
 		ln "$BACKUP_MAIN/$f" "$BACKUP_CURRENT/$fullname"

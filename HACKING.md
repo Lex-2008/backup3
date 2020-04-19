@@ -3,13 +3,13 @@ Style
 
 Use pipes and while loops, like this:
 
-	echo "$sql" | $SQLITE | while IFS="$NL" read f; do
+	echo "$sql" | $SQLITE | while IFS="$NL" read -r f; do
 		# operate on "$f"
 	done > "$BACKUP_TMP".sql
 	<"$BACKUP_TMP".sql | $SQLITE
 	rm "$BACKUP_TMP".sql
 
-Note `IFS="$NL"` before `read`!
+Note `IFS="$NL"` before and `-r` after `read`!
 
 Note that some implementations of $SQLITE don't support receiving sql expression
 as an argument or running two instances in parallel (most notably, "remote

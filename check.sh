@@ -29,7 +29,7 @@ db2current ()
 		ORDER BY dirname;" | $SQLITE | (
 			echo '.timeout 10000'
 			echo 'BEGIN TRANSACTION;'
-			while IFS="$NL" read f; do
+			while IFS="$NL" read -r f; do
 				filename="${f%%|*}"
 				rowid="${f##*|}"
 				if ! test -e "$BACKUP_CURRENT/$filename" -o -L "$BACKUP_CURRENT/$filename"; then
@@ -50,7 +50,7 @@ db2old ()
 		ORDER BY dirname;" | $SQLITE | (
 			echo '.timeout 10000'
 			echo 'BEGIN TRANSACTION;'
-			while IFS="$NL" read f; do
+			while IFS="$NL" read -r f; do
 				filename="${f%%|*}"
 				rowid="${f##*|}"
 				if ! test -e "$BACKUP_MAIN/$filename" -o -L "$BACKUP_MAIN/$filename"; then
@@ -126,7 +126,7 @@ old2db ()
 old2current ()
 {
 	cd "$BACKUP_MAIN"
-	find . \( -type f -o -type l \) -name "*$BACKUP_TIME_SEP$BACKUP_TIME_NOW" | while IFS="$NL" read f; do
+	find . \( -type f -o -type l \) -name "*$BACKUP_TIME_SEP$BACKUP_TIME_NOW" | while IFS="$NL" read -r f; do
 				# $f points to the file in data dir - i.e. it's like this:
 				# dirname/filename/created~now
 				filename="${f%/*}"
@@ -143,7 +143,7 @@ old2current ()
 
 current2old ()
 {
-	my_find "$BACKUP_CURRENT" . -type f -o -type l | sed -r 's/^([0-9]*) . (.*)/\1|\2/' | while IFS="$NL" read f; do
+	my_find "$BACKUP_CURRENT" . -type f -o -type l | sed -r 's/^([0-9]*) . (.*)/\1|\2/' | while IFS="$NL" read -r f; do
 		inode="${f%%|*}"
 		fullname="${f##*|}"
 		ls -i "$BACKUP_MAIN/$fullname" 2>/dev/null | grep -q "^ *$inode " || echo "$fullname"
@@ -185,7 +185,7 @@ db_overlaps ()
 		" | $SQLITE | (
 			echo '.timeout 10000'
 			echo 'BEGIN TRANSACTION;'
-			while IFS="$NL" read f; do
+			while IFS="$NL" read -r f; do
 				filenames="${f%|*}"
 				filename1="${filenames%%|*}"
 				filename2="${filenames##*|}"
@@ -204,7 +204,7 @@ db_order ()
 {
 	echo "SELECT dirname || filename || '/' || created || '$BACKUP_TIME_SEP' || deleted
 		FROM history
-		WHERE created >= deleted;" | $SQLITE | while IFS="$NL" read f; do
+		WHERE created >= deleted;" | $SQLITE | while IFS="$NL" read -r f; do
 			echo rm "$BACKUP_MAIN/$f" >>check.db_order
 			test -n "$FIX" && rm "$BACKUP_MAIN/$f"
 		done

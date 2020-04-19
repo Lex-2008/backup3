@@ -25,7 +25,7 @@ sql="PRAGMA case_sensitive_like = ON;
 	  AND created <= '$SHOW_DATE'
 	  AND deleted > '$SHOW_DATE';"
 
-echo "$sql" | $SQLITE | tr '\n' '\0' | while IFS="$NL" read f; do
+echo "$sql" | $SQLITE | tr '\n' '\0' | while IFS="$NL" read -r f; do
 	fullname="${f%|*}"
 	times="${f#*|}"
 	mkdir -p "$SHOW_IN/$(dirname "$fullname")"
