@@ -17,7 +17,7 @@ test -z "$BACKUP_TMP"     && BACKUP_TMP=$BACKUP_ROOT/tmp
 test -z "$BACKUP_MAIN"    && BACKUP_MAIN=$BACKUP_ROOT/data
 test -z "$PARTIAL_DIR"    && PARTIAL_DIR=$BACKUP_ROOT/partial
 test -z "$BACKUP_RSYNC_LOGS" && BACKUP_RSYNC_LOGS=$BACKUP_ROOT/rsync.logs
-test -z "$BACKUP_LOCAL_LOGS" # this is fine
+test -z "$BACKUP_LOCAL_LOGS" # this is fine, must NOT contain spaces
 test -z "$BACKUP_RSYNC_STATS" && BACKUP_RSYNC_STATS=$BACKUP_ROOT/rsync.stats
 test -z "$BACKUP_FIND_FILTER" # this is fine
 test -z "$BACKUP_DB"      && BACKUP_DB=$BACKUP_ROOT/backup.db
