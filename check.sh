@@ -131,7 +131,7 @@ old2current ()
 				# dirname/filename/created~now
 				filename="${f%/*}"
 				if ! test -f "$BACKUP_CURRENT/$filename" -o -L "$BACKUP_CURRENT/$filename"; then
-					echo "ln $BACKUP_MAIN/$f => $BACKUP_CURRENT/$filename"
+					echo "ln $BACKUP_MAIN/$f => $BACKUP_CURRENT/$filename" >>check.old2current
 					if test -n "$FIX"; then
 						mkdir -p "$BACKUP_CURRENT/${filename%/*}"
 						ln "$BACKUP_MAIN/$f" "$BACKUP_CURRENT/$filename"
