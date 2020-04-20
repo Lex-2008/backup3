@@ -143,30 +143,12 @@ old2current ()
 
 current2old ()
 {
+	test -n "$FIX" && echo "current2old: --fix is not supported"
 	my_find "$BACKUP_CURRENT" . -type f -o -type l | sed -r 's/^([0-9]*) . (.*)/\1|\2/' | while IFS="$NL" read -r f; do
 		inode="${f%%|*}"
 		fullname="${f##*|}"
 		ls -i "$BACKUP_MAIN/$fullname" 2>/dev/null | grep -q "^ *$inode " || echo "$fullname"
-	done | (
-		if test -n "$FIX"; then
-			cd "$BACKUP_CURRENT"
-			# These files might either be in DB, or not. If they
-			# are not in DB - it was taken care of above, in
-			# `current2db`. But if they are in DB - we sholud make
-			# sure that on next run of backup.sh script they will
-			# be marked as modified. For this, we make a sed script
-			# to convert list of filenames to sed script which
-			# clears inode numbers of relevant entries in
-			# "$BACKUP_LIST", and apply it. After that we must sort
-			# "$BACKUP_LIST" file again
-			tee "$BACKUP_ROOT/check.current2old" | fgrep -vz -f- "$BACKUP_LIST" >"$BACKUP_LIST.new"
-			sed 's/^/0 /' "$BACKUP_ROOT/check.current2old" | tr '\n' '\0' >>"$BACKUP_LIST.new"
-			LC_ALL=POSIX sort -z "$BACKUP_LIST.new" >"$BACKUP_LIST"
-			rm "$BACKUP_LIST.new"
-		else
-			cat >"$BACKUP_ROOT/check.current2old"
-		fi
-	)
+	done >"$BACKUP_ROOT/check.current2old"
 }
 
 db_overlaps ()
@@ -268,7 +250,8 @@ echo "BEGIN TRANSACTION; DROP INDEX IF EXISTS history_update; CREATE INDEX IF NO
 # Tests that might add new files in current
 check old2current
 
-# Tests that might delete some files in db
+# Tests that might delete files in 'old' but leave entries in db
+# db2old will remove them from db, but they will remain in 'current'
 check db_order
 
 # Tests that might delete some DB rows
@@ -282,7 +265,8 @@ check db_overlaps
 # Tests that might add new rows
 check old2db
 
-# Tests that remove files from files.txt
+# Tests that do not have '--fix' option
+# (fixed by running `backup.sh`)
 check current2db
 check current2old
 
