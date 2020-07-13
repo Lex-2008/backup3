@@ -17,6 +17,7 @@
 #   -q to be less verbose regarding missing files
 #   -qq to be less verbose regarding OK files (report only issues)
 #   -r to process files in random order
+#   -d to process files in date order (newest first)
 
 . "$(dirname "$0")/common.sh"
 
@@ -30,11 +31,14 @@ if test "$1" = "-qq"; then
 	shift
 fi
 
+sort_by="dirname"
 if test "$1" = "-r"; then
 	sort_by="random()"
 	shift
-else
-	sort_by="dirname"
+fi
+if test "$1" = "-d"; then
+	sort_by="created DESC"
+	shift
 fi
 
 cond2="AND created<strftime('%Y-%m', 'now')"
