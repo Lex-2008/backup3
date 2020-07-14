@@ -67,5 +67,13 @@ echo "$sql" | $SQLITE | (
 			echo "checked [$a], secured [$b] files"
 		fi
 	done
-	echo "$b out of $a files secured ($(dc $b 100 '*' $a / p)%)"
+	if dc --help 2>&1 | head -n1 | grep -q 'BusyBox v1.2'; then
+		# busybox before 1.30.0 has dc which accepts plain expression
+		prc=$(dc $b 100 '*' $a / p)
+	else
+		# other dc need `-e` before expression (otherwise treat argument
+		# as a filename)
+		prc=$(dc -e "$b 100 '*' $a / p")
+	fi
+	echo "$b out of $a files secured ($prc%)"
 	)
