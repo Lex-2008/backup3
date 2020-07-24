@@ -73,7 +73,7 @@ echo "$sql" | $SQLITE | (
 	else
 		# other dc need `-e` before expression (otherwise treat argument
 		# as a filename)
-		prc=$(dc -e "$b 100 '*' $a / p")
+		prc=$(dc -e "$b 100 * $a / p")
 	fi
 	echo "$b out of $a files secured ($prc%)"
 	)
