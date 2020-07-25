@@ -37,10 +37,10 @@ ls=async(dir,at)=>{
 					`<a class="file" href="#${dir}|${at}|${a[0]}">${a[0]}</a>`
 					):pass?(
 						// downlad passworded file
-						`<a class="file" href="#${dir}|${at}|${a[0]}|${a[1]}">${a[0]}</a>`
+						`<a class="file" href="#${dir}|${at}|${a[0]}|${a[2]}">${a[0]}</a>`
 					       ):(
 						       // downlad file directly
-						       `<a class="file" href="/cgi-bin/api.sh?|get|${dir}|${a[1]}|${a[0]}">${a[0]}</a>`
+						       `<a class="file" href="/cgi-bin/api.sh?|get|${dir}|${a[2]}|${a[0]}">${a[0]}</a>`
 						 )).join('');
 	if(pass){
 		// show tar-btn
