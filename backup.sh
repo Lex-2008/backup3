@@ -38,7 +38,7 @@ run_rsync()
 		mv "$logfile" "$BACKUP_RSYNC_LOGS"
 	fi
 	# sync files
-	timeout $TIMEOUT_ARG "$BACKUP_TIMEOUT" rsync -a --itemize-changes --human-readable --stats --delete --one-file-system --partial-dir="$PARTIAL_DIR/$to" $rsync_logfile_exclude "$@" $RSYNC_EXTRA "$from" "$BACKUP_CURRENT/$to" >"$logfile" 2>&1
+	timeout $TIMEOUT_ARG "$BACKUP_TIMEOUT" rsync -a --itemize-changes --human-readable --stats --delete --partial-dir="$PARTIAL_DIR/$to" $rsync_logfile_exclude "$@" $RSYNC_EXTRA "$from" "$BACKUP_CURRENT/$to" >"$logfile" 2>&1
 	# add them to DB
 	compare "$to"
 	# create stats file if it doesn't exist
