@@ -367,33 +367,12 @@ stackexchange answer):
 
 ### Removing duplicates
 
-If you have rdfind installed, you might want to use these commands to hardlink
-similar files to each other:
+Among all (two) utilities I checked for removing duplicates, [rmlint][] seems to
+work best. Recommended options to use it are:
 
-	cd "$BACKUP_ROOT"
-	rdfind -ignoreempty false -removeidentinode false -makehardlinks true current data
-	sed="s/'/''/g        # duplicate single quotes
-		1i BEGIN TRANSACTION;
-		\$a END TRANSACTION;
-		s_^([0-9]*) ((.*)/)?(.*)_	\\
-		UPDATE history SET inode='\\1' WHERE dirname='\\3' AND filename='\\4';	\\
-		_"
-	/usr/bin/find "$BACKUP_CURRENT" $BACKUP_FIND_FILTER \( -type f -o -type l \) -printf '%i %P\n' | sed -r "$sed" | $SQLITE
+	rmlint -T df -c sh:hardlink -k --keep-hardlinked data // current
 
-Last two commands update database with inodes of new files. Note, however,
-that `rdfind` will change timestamps of some files in "current" backup dir, so
-rsync still will overwrite them on next run, creating new duplicates. Moreover,
-it might hardlink together files in "current" dir which have same contents but
-different permissions. As a result, _each_ following rsync run will flip their
-permissions.
-
-More clean command (which checks only copies of same files) is like this:
-
-	cd "$BACKUP_ROOT"
-	(cd current/ && find -type f -print0) | xargs -0 -I% rdfind -ignoreempty false -removeidentinode false -makehardlinks true -makeresultsfile false current/% data/% >/dev/null
-
-It runs `rdfind` multiple times, once for each file in "current" backup dir,
-checking for duplicates among copies of this file.
+[rmlint]: https://github.com/sahib/rmlint
 
 ### Migrating from "old" (rsync --link-dest) style to current one.
 
