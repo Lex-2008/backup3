@@ -32,13 +32,13 @@ run_rsync()
 	# test if we need to run it at all - or not enough time had passed
 	test "$(date -r "$logfile" +"$date_fmt" 2>/dev/null)" = "$(date -d "$BACKUP_TIME" +"$date_fmt")" && return 0
 	# test if we can connect
-	test -d "$from" || timeout $TIMEOUT_ARG "$BACKUP_SCAN_TIMEOUT" rsync "$@" $RSYNC_EXTRA "$from" >/dev/null 2>&1 || return 0
+	test -d "$from" || $TIMEOUT "$BACKUP_SCAN_TIMEOUT" rsync "$@" $RSYNC_EXTRA "$from" >/dev/null 2>&1 || return 0
 	if test -n "$BACKUP_LOCAL_LOGS"; then
 		# ensure that logfile inode changes
 		mv "$logfile" "$BACKUP_RSYNC_LOGS"
 	fi
 	# sync files
-	timeout $TIMEOUT_ARG "$BACKUP_TIMEOUT" rsync -a --itemize-changes --human-readable --stats --delete --partial-dir="$PARTIAL_DIR/$to" $rsync_logfile_exclude "$@" $RSYNC_EXTRA "$from" "$BACKUP_CURRENT/$to" >"$logfile" 2>&1
+	$TIMEOUT "$BACKUP_TIMEOUT" rsync -a --itemize-changes --human-readable --stats --delete --partial-dir="$PARTIAL_DIR/$to" $rsync_logfile_exclude "$@" $RSYNC_EXTRA "$from" "$BACKUP_CURRENT/$to" >"$logfile" 2>&1
 	# add them to DB
 	compare "$to"
 	# create stats file if it doesn't exist

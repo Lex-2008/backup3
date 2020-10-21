@@ -58,9 +58,18 @@ WHEN 1 THEN strftime('%Y-%m', 'now', 'localtime', 'start of month', '+1 month', 
 WHEN 30 THEN strftime('%Y-%m-%d', 'now', 'localtime', '+1 day', '-$HARDLINK_d days')
 WHEN 720 THEN strftime('%Y-%m-%d %H', 'now', 'localtime', '+1 hour', '-$HARDLINK_h hours')"
 
-if timeout --help 2>&1 | head -n1 | grep -q 'BusyBox v1.2'; then
-    # busybox before 1.30 required -t argument before time
-	  TIMEOUT_ARG='-t'
+# Figure out `timeout` command
+if type timeout >/dev/null; then
+    if timeout --help 2>&1 | head -n1 | grep -q 'BusyBox v1.2'; then
+        # busybox before 1.30 required -t argument before time
+        TIMEOUT='timeout -t'
+    else
+        # modern implementations of timeout accept seconds as first argument
+        TIMEOUT=timeout
+    fi
+else
+    # use shell implementation
+    TIMEOUT="$BACKUP_BIN/timeout.sh"
 fi
 
 NL="
