@@ -43,6 +43,9 @@ if test "$BACKUP_CLEAN_BY_FREQ" = "1"; then
 			rowid
 		FROM history
 		WHERE freq != 0
+      AND deleted <= CASE freq
+          $HARDLINK_EXPR
+          ELSE 'now' END
 		ORDER BY age DESC;"
 else
 	# Uses 'timeline' index both for WHERE and for ORDER BY

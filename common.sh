@@ -34,6 +34,12 @@ test -z "$BACKUP_CLEAN_VAR" && BACKUP_CLEAN_VAR="%" # '%' or 'G'
 test -z "$BACKUP_CLEAN_BY_FREQ" && BACKUP_CLEAN_BY_FREQ=1
 test -z "$SQLITE"         && SQLITE="sqlite3 $BACKUP_DB"
 
+test -z "$HARDLINK"       && HARDLINK=none # "strict" or "loose"
+test -z "$HARDLINK_DIR"   && HARDLINK_DIR="$BACKUP_ROOT/by-date"
+test -z "$HARDLINK_m"     && HARDLINK_m=0 # monthly - 12 for a year
+test -z "$HARDLINK_d"     && HARDLINK_d=0 # daily - 7 for 1 week
+test -z "$HARDLINK_h"     && HARDLINK_h=0 # hourly - 24 for 1 day
+
 test -z "$CLEAN_BY_FREQ"  && CLEAN_BY_FREQ="1" # set to 0 to ignore freq when cleaning
 
 test -z "$BACKUP_PAR2_SIZELIMIT" && BACKUP_PAR2_SIZELIMIT=300000 # minimum file size to create *.par2 archive, smaller files are copied to *.bak ones as-is
@@ -46,6 +52,11 @@ test -z "$BACKUP_PAR2_LOG" && BACKUP_PAR2_LOG=$BACKUP_ROOT/par2.log
 # hence 2592000/BACKUP_MAX_FREQ is number of seconds / event
 # usually 300 seconds for BACKUP_MAX_FREQ=8640 (5 minutes)
 BACKUP_MAX_FREQ_SEC="$(echo "2592000 $BACKUP_MAX_FREQ / p" | dc)"
+
+HARDLINK_EXPR="
+WHEN 1 THEN strftime('%Y-%m', 'now', 'localtime', 'start of month', '+1 month', '-$HARDLINK_m months')
+WHEN 30 THEN strftime('%Y-%m-%d', 'now', 'localtime', '+1 day', '-$HARDLINK_d days')
+WHEN 720 THEN strftime('%Y-%m-%d %H', 'now', 'localtime', '+1 hour', '-$HARDLINK_h hours')"
 
 if timeout --help 2>&1 | head -n1 | grep -q 'BusyBox v1.2'; then
     # busybox before 1.30 required -t argument before time

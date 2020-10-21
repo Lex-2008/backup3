@@ -174,5 +174,7 @@ fi
 
 test "$BACKUP_CLEAN_ON" == 'post' && . $BACKUP_BIN/clean.sh
 
+. $BACKUP_BIN/hardlink.sh
+
 # release the lock
 rm "$BACKUP_FLOCK"
