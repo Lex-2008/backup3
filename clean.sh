@@ -6,16 +6,7 @@
 case "$BACKUP_CLEAN_VAR" in
 	( "%" )
 		total_space=$(df -PB1 "$BACKUP_MAIN" | awk 'FNR==2{print $2}')
-		# check which of two implementations of `dc` we have
-		if dc --help 2>&1 | head -n1 | grep -q 'BusyBox v1.2'; then
-			# busybox before 1.30.0 has dc which accepts plain expression,
-			# has float division (`3/2=1.5`), and needs `or 0` to round it
-			FREE_SPACE_NEEDED=$(dc $total_space 100 / $BACKUP_CLEAN_VAL \* 0 or p)
-		else
-			# other dc need `-e` before expression (otherwise treat argument
-			# as a filename) and has integer division (`3/2=1`)
-			FREE_SPACE_NEEDED=$(dc -e "$total_space 100 / $BACKUP_CLEAN_VAL * p")
-		fi
+    		FREE_SPACE_NEEDED=$(( total_space / 100 * BACKUP_CLEAN_VAL ))
 		;;
 	( "G" )
 		FREE_SPACE_NEEDED=${BACKUP_CLEAN_VAL}024024024

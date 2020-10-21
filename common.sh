@@ -51,7 +51,7 @@ test -z "$BACKUP_PAR2_LOG" && BACKUP_PAR2_LOG=$BACKUP_ROOT/par2.log
 # BACKUP_MAX_FREQ is number of events / month
 # hence 2592000/BACKUP_MAX_FREQ is number of seconds / event
 # usually 300 seconds for BACKUP_MAX_FREQ=8640 (5 minutes)
-BACKUP_MAX_FREQ_SEC="$(echo "2592000 $BACKUP_MAX_FREQ / p" | dc)"
+BACKUP_MAX_FREQ_SEC="$(( 2592000 / BACKUP_MAX_FREQ ))"
 
 HARDLINK_EXPR="
 WHEN 1 THEN strftime('%Y-%m', 'now', 'localtime', 'start of month', '+1 month', '-$HARDLINK_m months')
