@@ -5,7 +5,7 @@
 
 case "$BACKUP_CLEAN_VAR" in
 	( "%" )
-		total_space=$(df -Pk "$BACKUP_MAIN" | awk 'FNR==2{print $2}')
+		total_space=$(df -Pm "$BACKUP_MAIN" | awk 'FNR==2{print $2}')
     		FREE_SPACE_NEEDED=$(( total_space / 100 * BACKUP_CLEAN_VAL ))
 		;;
 	( "G" )
@@ -18,7 +18,7 @@ esac
 # return status of 0 (true) means "need to clear space"
 check_space()
 {
-	free_space_available=$(df -Pk "$BACKUP_MAIN" | awk 'FNR==2{print $4}')
+	free_space_available=$(df -Pm "$BACKUP_MAIN" | awk 'FNR==2{print $4}')
 	test "$free_space_available" -lt "$FREE_SPACE_NEEDED"
 }
 
