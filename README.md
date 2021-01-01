@@ -63,8 +63,9 @@ It will create necessary dirs and sqlite database to hold information.
 ### Requirements
 
 * sqlite3 3.31.0 or higher (for [generated columns][gencol], can be accessed remotely via network)
-* busybox (ash, du, df, stat, also httpd for [WebUI](#webui))
-* find (optionally - better for performance)
+* busybox (ash with `type` and `$((math))`, df with `-Pm`)
+* busybox httpd (optionally - only if using [WebUI](#webui))
+* GNU find (optionally - better for performance)
 * smbclient (optionally - only if using password-protected dirs in WebUI)
 * par2create (optionally - only if creating par2 files)
 * cpulimit (optionally - only if limiting cpu usage by par2 process)
