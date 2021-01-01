@@ -22,6 +22,7 @@ run_rsync()
 		rsync_logfile_exclude="--exclude=$BACKUP_LOCAL_LOGS"
 	fi
 	statsfile="$BACKUP_RSYNC_STATS/$to.log"
+	mkdir -p "$(dirname "$logfile")" "$(dirname "$statsfile")"
 	case "$when" in
 		( hourly )	date_fmt="%F %H" ;;
 		( daily )	date_fmt="%F" ;;
