@@ -8,9 +8,9 @@ for f in 1 30 720; do
     case $f in
         # note1: now_fmt MUST have different lengths or separators
         # note2: they must match oldest_dir_to_keep (generated from HARDLINK_EXPR)
-        ( 1 )    dir_fmt="%Y-%m"; strict_fmt="%d %H:%M"; strict_match="01 00:00"; date_fmt="%Y-%m-01" ;; # monthly
-        ( 30 )   dir_fmt="%Y-%m-%d"; strict_fmt="%H:%M"; strict_match="00:00"; date_fmt="%Y-%m-%d" ;;    # daily
-        ( 720 )  dir_fmt="%Y-%m-%d %H"; strict_fmt="%M"; strict_match="00"; date_fmt="%Y-%m-%d %H:00" ;; # hourly
+        ( 1 )   test "$HARDLINK_m" = 0 && continue; dir_fmt="%Y-%m"; strict_fmt="%d %H:%M"; strict_match="01 00:00"; date_fmt="%Y-%m-01" ;; # monthly
+        ( 30 )  test "$HARDLINK_d" = 0 && continue; dir_fmt="%Y-%m-%d"; strict_fmt="%H:%M"; strict_match="00:00"; date_fmt="%Y-%m-%d" ;;    # daily
+        ( 720 ) test "$HARDLINK_h" = 0 && continue; dir_fmt="%Y-%m-%d %H"; strict_fmt="%M"; strict_match="00"; date_fmt="%Y-%m-%d %H:00" ;; # hourly
     esac
     dir="$(date -d "$BACKUP_TIME" +"$dir_fmt")"
     if ! test -d "$HARDLINK_DIR/$dir"; then
