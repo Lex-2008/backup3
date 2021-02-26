@@ -87,8 +87,8 @@ my_find()
 {
 	cd "$1"
 	shift
-	if test -f "$(type -p find)" && "$(type -p find)" --version 2>&1 | grep -q GNU; then
-		"$(type -p find)" "$@" -printf '%i %y %h/%f\n'
+	if test -f "$(which find 2>/dev/null)" && "$(which find)" --version 2>&1 | grep -q GNU; then
+		"$(which find)" "$@" -printf '%i %y %h/%f\n'
 	else
 		sed='s/^([0-9]*) regular( empty)? file /\1 f /
 		     s/^([0-9]*) directory /\1 d /
