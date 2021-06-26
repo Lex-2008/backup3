@@ -42,6 +42,7 @@ test -z "$HARDLINK_d"     && HARDLINK_d=0 # daily - 7 for 1 week
 test -z "$HARDLINK_h"     && HARDLINK_h=0 # hourly - 24 for 1 day
 
 test -z "$CLEAN_BY_FREQ"  && CLEAN_BY_FREQ="1" # set to 0 to ignore freq when cleaning
+test -z "$STATS_DU"       && STATS_DU="1" # show "Disk usage of each dir" in stats.sh output
 
 test -z "$BACKUP_PAR2_SIZELIMIT" && BACKUP_PAR2_SIZELIMIT=300000 # minimum file size to create *.par2 archive, smaller files are copied to *.bak ones as-is
 test -z "$BACKUP_PAR2_CPULIMIT" && BACKUP_PAR2_CPULIMIT=0 # limit CPU usage by par2 process
