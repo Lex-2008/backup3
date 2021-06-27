@@ -5,6 +5,8 @@
 test -z "$BACKUP_BIN" && BACKUP_BIN="${0%/*}"
 . "$BACKUP_BIN/common.sh"
 
+cd "$BACKUP_ROOT"
+
 banner() {
 	echo  ===== ===== "$@" ===== =====
 }
@@ -21,8 +23,6 @@ df -h -x devtmpfs -x tmpfs | uniq -w 9
 
 echo
 banner backup stats
-
-cd /mnt/backups/new
 
 echo " SELECT
 		dirname AS 'Last backup of browser tabs',
