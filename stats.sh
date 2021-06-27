@@ -19,7 +19,7 @@ echo
 # sensors
 
 banner disk usage
-df -h -x devtmpfs -x tmpfs | uniq -w 9
+sh -c "$STATS_DF"
 
 echo
 banner backup stats
