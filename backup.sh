@@ -57,7 +57,7 @@ compare()
 	ddir="."
 	if test -n "$dir"; then
 		ddir="./$dir"
-		sql_dir="AND history.dirname LIKE './$dir/%'"
+		sql_dir="AND dirname LIKE './$dir/%'"
 	fi
 
 	# sed expression to convert `find` output into SQL query which imports
@@ -65,6 +65,7 @@ compare()
 	# prints nothing, but that's unlikely to happen IRL
 	sed="s/'/''/g        # duplicate single quotes
 		1i BEGIN TRANSACTION;
+		1i DROP TABLE IF EXISTS fs;
 		1i CREATE TEMPORARY TABLE fs (inode INTEGER, type TEXT, dirname TEXT, filename TEXT);
 		s_^([0-9]*) (.) (.*/)([^/]*)/?_	\\
 			INSERT INTO fs (inode, type, dirname, filename)	\\
@@ -88,26 +89,33 @@ compare()
 		-- table.  The 'history.freq = 0' part is here both for
 		-- performance reasons and to ensure that long-deleted files do
 		-- not affect the result in case of inode reuse
+		DROP TABLE IF EXISTS new_files;
 		CREATE TEMPORARY TABLE new_files AS
-			SELECT fs.inode, fs.type, fs.dirname, fs.filename, '$BACKUP_TIME', '$BACKUP_TIME_NOW'
-			FROM fs LEFT JOIN history INDEXED BY history_update
-			ON  fs.inode = history.inode
-			AND fs.type = history.type
-			AND fs.dirname = history.dirname
-			AND fs.filename = history.filename
-			AND history.freq = 0 -- to make history INDEXED BY history_update
-			WHERE history.inode IS NULL;
+			SELECT inode, type, dirname, filename, '$BACKUP_TIME', '$BACKUP_TIME_NOW'
+			FROM fs
+			WHERE NOT EXISTS (SELECT * FROM history INDEXED BY history_update
+				WHERE fs.inode = history.inode
+				  AND fs.type = history.type
+				  AND fs.dirname = history.dirname
+				  AND fs.filename = history.filename
+				  AND history.freq = 0)
+			$sql_dir;
 		-- Lines from history which don't have corresponding entry in
 		-- 'fs' table. The 'history.freq = 0' part is there both for
 		-- performance reasons and so we skip entries in 'history' table
 		-- which correspond to files deleted long time ago.
+		DROP TABLE IF EXISTS old_files;
 		CREATE TEMPORARY TABLE old_files AS
-			SELECT history.type, history.dirname, history.filename, history.created
-			FROM history INDEXED BY history_update LEFT JOIN fs
-			USING (inode, type, dirname, filename)
-			WHERE fs.inode IS NULL
-			   AND history.freq = 0 -- to make history INDEXED BY history_update
-			   $sql_dir;
+			SELECT type, dirname, filename, created
+			FROM history INDEXED BY history_update
+			WHERE NOT EXISTS (SELECT * FROM fs
+				WHERE fs.inode = history.inode
+				  AND fs.type = history.type
+				  AND fs.dirname = history.dirname
+				  AND fs.filename = history.filename
+				  )
+			  AND history.freq = 0
+			  $sql_dir;
 		-- STEP 2: Update 'history' table.
 		-- First, update deleted entries - that will also update 'freq'
 		UPDATE history SET deleted = '$BACKUP_TIME'
@@ -118,6 +126,13 @@ compare()
 			)
 		  AND freq = 0;
 		-- Now, add new entries
+		INSERT INTO bad_new_files SELECT * from new_files
+			WHERE EXISTS (SELECT * FROM history
+				WHERE new_files.type = history.type
+				  AND new_files.dirname = history.dirname
+				  AND new_files.filename = history.filename
+				  AND history.freq = 0
+			);
 		INSERT INTO history (inode, type, dirname, filename, created, deleted) SELECT * FROM new_files;
 		PRAGMA optimize;
 		-- STEP 3: Print out lists of new and deleted files.
