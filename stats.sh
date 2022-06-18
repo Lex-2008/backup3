@@ -68,6 +68,12 @@ echo " SELECT
 	  AND freq <= 8640
         GROUP BY freq;" | $SQLITE -header -column
 
+if [ "$(echo 'SELECT count(*) FROM bad_new_files' | $SQLITE)" != 0 ]; then
+	banner bad new files
+	echo 'SELECT * FROM bad_new_files' | $SQLITE -header -column
+fi
+
+
 test "$STATS_DU" = 1 || exit 0
 
 echo
