@@ -35,20 +35,28 @@ echo " SELECT
 	GROUP BY dirname;" | $SQLITE -header -column
 
 echo
+
+echo 'Last backup per'
+ls "$BACKUP_CURRENT" | while read -r line; do
 echo " SELECT
-		max(created) AS 'Last backup overall',
+		'$line' as 'directory      ',
 		'created' AS 'direction',
+		max(created) AS 'Last backup',
 		round(julianday('now', 'localtime') - julianday(max(created)), 2) AS 'days ago'
 	FROM history
 	WHERE freq = 0
+	  AND dirname LIKE './$line/%'
 UNION ALL
 	SELECT
-		max(deleted) AS 'Last backup overall',
+		'$line',
 		'deleted' AS 'direction',
+		max(deleted) AS 'Last backup',
 		round(julianday('now', 'localtime') - julianday(max(deleted)), 2) AS 'days ago'
 	FROM history
 	WHERE freq != 0
-	;" | $SQLITE -header -column
+	  AND dirname LIKE './$line/%'
+UNION ALL"
+done | sed '$d' | $SQLITE -header -column
 
 echo
 echo " SELECT
