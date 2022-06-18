@@ -7,7 +7,7 @@ acquire_lock
 
 echo "### DATABASE ###"
 
-rm "$BACKUP_DB"
+rm -f "$BACKUP_DB" "$BACKUP_DB-shm" "$BACKUP_DB-wal"
 
 echo "1: create"
 $BACKUP_BIN/init.sh --noindex
