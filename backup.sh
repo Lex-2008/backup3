@@ -173,7 +173,7 @@ compare()
 	wait
 
 	# clean up
-  test -z "$BACKUP_KEEP_TMP" && rm "$BACKUP_TMP".sql "$BACKUP_TMP".files
+	test -z "$BACKUP_KEEP_TMP" && rm "$BACKUP_TMP".sql "$BACKUP_TMP".files
 }
 
 ### RUN ###
