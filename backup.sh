@@ -57,7 +57,7 @@ compare()
 	ddir="."
 	if test -n "$dir"; then
 		ddir="./$dir"
-		sql_dir="AND dirname LIKE './$dir/%'"
+		sql_dir="AND history.dirname LIKE './$dir/%'"
 	fi
 
 	# sed expression to convert `find` output into SQL query which imports
@@ -91,14 +91,14 @@ compare()
 		-- not affect the result in case of inode reuse
 		DROP TABLE IF EXISTS new_files;
 		CREATE TEMPORARY TABLE new_files AS
-			SELECT inode, type, dirname, filename, '$BACKUP_TIME', '$BACKUP_TIME_NOW'
-			FROM fs
-			WHERE NOT EXISTS (SELECT * FROM history INDEXED BY history_update
-				WHERE fs.inode = history.inode
-				  AND fs.type = history.type
-				  AND fs.dirname = history.dirname
-				  AND fs.filename = history.filename
-				  AND history.freq = 0)
+			SELECT fs.inode, fs.type, fs.dirname, fs.filename, '$BACKUP_TIME', '$BACKUP_TIME_NOW'
+			FROM fs LEFT JOIN history INDEXED BY history_update
+			ON  fs.inode = history.inode
+			AND fs.type = history.type
+			AND fs.dirname = history.dirname
+			AND fs.filename = history.filename
+			AND history.freq = 0 -- to make history INDEXED BY history_update
+			WHERE history.inode IS NULL
 			$sql_dir;
 		-- Lines from history which don't have corresponding entry in
 		-- 'fs' table. The 'history.freq = 0' part is there both for
@@ -106,16 +106,12 @@ compare()
 		-- which correspond to files deleted long time ago.
 		DROP TABLE IF EXISTS old_files;
 		CREATE TEMPORARY TABLE old_files AS
-			SELECT type, dirname, filename, created
-			FROM history INDEXED BY history_update
-			WHERE NOT EXISTS (SELECT * FROM fs
-				WHERE fs.inode = history.inode
-				  AND fs.type = history.type
-				  AND fs.dirname = history.dirname
-				  AND fs.filename = history.filename
-				  )
-			  AND history.freq = 0
-			  $sql_dir;
+			SELECT history.type, history.dirname, history.filename, history.created
+			FROM history INDEXED BY history_update LEFT JOIN fs
+			USING (inode, type, dirname, filename)
+			WHERE fs.inode IS NULL
+			   AND history.freq = 0 -- to make history INDEXED BY history_update
+			   $sql_dir;
 		-- STEP 2: Update 'history' table.
 		-- First, update deleted entries - that will also update 'freq'
 		UPDATE history SET deleted = '$BACKUP_TIME'
