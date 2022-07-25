@@ -40,6 +40,15 @@ CREATE TABLE history(
 		END
 	) STORED
 );
+DROP TABLE IF EXISTS bad_new_files;
+CREATE TABLE bad_new_files(
+  inode INT,
+  type TEXT,
+  dirname TEXT,
+  filename TEXT,
+  created TEXT,
+  deleted TEXT
+);
 " | $SQLITE
 
 test "$1" = "--noindex" || echo "
