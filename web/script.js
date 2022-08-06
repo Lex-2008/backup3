@@ -37,10 +37,14 @@ ls=async(dir,at)=>{
 					`<a class="file" href="#${dir}|${at}|${a[0]}">${a[0]}</a>`
 					):pass?(
 						// downlad passworded file
-						`<a class="file" href="#${dir}|${at}|${a[0]}|${a[2]}">${a[0]}</a>`
+						`<a class="file" href="#${dir}|${at}|${a[0]}|${a[2]}"
+						${$('#file_dl').checked?`download`:''}
+						>${a[0]}</a>`
 					       ):(
 						       // downlad file directly
-						       `<a class="file" href="/cgi-bin/api.sh?|get|${dir}|${a[2]}|${a[0]}">${a[0]}</a>`
+						       `<a class="file" href="/cgi-bin/api.sh?|get|${dir}|${a[2]}|${a[0]}"
+							${$('#file_dl').checked?`download`:''}
+						       >${a[0]}</a>`
 						 )).join('');
 	if(pass){
 		// show tar-btn
@@ -294,7 +298,7 @@ getFile=(params, name)=>{
 
 $('#file_group').onclick=$('#file_close').onclick=closeFileDetails;
 
-$('#file_dl').onclick=$('#file_show').onclick=render;
+$('#file_dl').onclick=$('#file_open').onclick=$('#file_show').onclick=render;
 
 $('#tar-btn').onclick=()=>getFile(`tar|${path}|${time}`,path.replace(/.*[\/]/,'')+'.tar');
 

@@ -52,6 +52,18 @@ html {height:100%}
 	background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='16' height='16' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E %3Cpath d='M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z'/%3E %3Cline x1='12' y1='9' x2='12' y2='13'/%3E %3Cline x1='12' y1='17' x2='12.01' y2='17'/%3E %3C/svg%3E");
 }
 
+/* https://feathericons.com/?query=info
+ */
+.info {
+	display:inline-block;
+	width: 16px;
+	height: 16px;
+	top: 3.5px;
+	position: relative;
+	background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='16' height='16' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E %3Cpath d='M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z'/%3E %3Cline x1='12' y1='9' x2='12' y2='13'/%3E %3Cline x1='12' y1='17' x2='12.01' y2='17'/%3E %3C/svg%3E");
+	background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' class='feather feather-info'%3E%3Ccircle cx='12' cy='12' r='10'%3E%3C/circle%3E%3Cline x1='12' y1='16' x2='12' y2='12'%3E%3C/line%3E%3Cline x1='12' y1='8' x2='12.01' y2='8'%3E%3C/line%3E%3C/svg%3E");
+}
+
 .shade {
 	display: flex;
 	align-items: center;
@@ -93,8 +105,14 @@ html {height:100%}
 <div class="bar">
 	<fieldset class="actions"><legend>При выборе файла</legend>
 		<label>
-			<input type="radio" name="file_action" checked id="file_dl">
+			<input type="radio" name="file_action" id="file_dl">
 			Скачать его
+		</label>
+		<br>
+		<label>
+			<input type="radio" name="file_action" checked id="file_open">
+			Просмотреть его
+			<span class="info" title="Только если формат файла поддерживается браузером. Если не поддерживается - файл будет скачан"></span>
 		</label>
 		<br>
 		<label>
