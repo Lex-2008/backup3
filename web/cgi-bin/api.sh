@@ -11,7 +11,7 @@ test -z "$BACKUP_BIN" && BACKUP_BIN=../..
 #      get|dir|date|file
 #       ll|dir|*|file
 
-if expr "$QUERY_STRING" : "sync"; then
+if test "${QUERY_STRING::4}" = "sync"; then
 	echo "HTTP/1.0 200 OK"
 	echo "Cache-Control: max-age=600"
 	echo
@@ -20,7 +20,7 @@ if expr "$QUERY_STRING" : "sync"; then
 fi
 
 
-if test "$QUERY_STRING" = "|init"; then
+if test "$QUERY_STRING" = "|init" -o "$QUERY_STRING" = "%7Cinit"; then
 	echo "HTTP/1.0 200 OK"
 	echo "Cache-Control: max-age=600"
 	echo
@@ -31,7 +31,7 @@ fi
 
 
 IFS='|' read -r pass request dir date file <<EOL
-$(busybox httpd -d "$QUERY_STRING")
+$(printf '%b' "${QUERY_STRING//%/\\x}")
 EOL
 # TODO: clean them from '
 
@@ -74,6 +74,7 @@ case "$request" in
 	(ls)
 		echo "HTTP/1.0 200 OK"
 		echo "Cache-Control: max-age=600"
+		echo "Content-Type: text/plain"
 		echo
 		echo "SELECT filename, type, created || '$BACKUP_TIME_SEP' || deleted
 			FROM history
@@ -86,6 +87,7 @@ case "$request" in
 	(timeline)
 		echo "HTTP/1.0 200 OK"
 		echo "Cache-Control: max-age=600"
+		echo "Content-Type: text/plain"
 		# echo "Content-Encoding: gzip"
 		echo
 		echo "PRAGMA case_sensitive_like = ON;
@@ -127,7 +129,7 @@ case "$request" in
 		echo "HTTP/1.0 200 OK"
 		echo "Cache-Control: max-age=600"
 		filename="$BACKUP_MAIN/$dir/$file/$date"
-		echo "Content-Disposition: attachment; filename=\"$file\""
+		echo "Content-Disposition: inline; filename=\"$file\""
 		test -f "$filename" || exit 2
 		stat -c 'Content-Length: %s' "$filename"
 		echo
@@ -136,6 +138,7 @@ case "$request" in
 	(ll)
 		echo "HTTP/1.0 200 OK"
 		echo "Cache-Control: max-age=600"
+		echo "Content-Type: text/plain"
 		echo
 		echo "$BACKUP_TIME_SEP"
 		echo "$BACKUP_TIME_NOW"
