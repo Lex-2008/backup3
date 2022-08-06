@@ -73,6 +73,22 @@ html {height:100%}
 .dialog button {width:100%}
 .dialog td{white-space: nowrap}
 
+/* https://codepen.io/thetallweeks/pen/yybGra */
+.loading {
+  font-size: 30px;
+  text-align: center;
+  width: 100%;
+}
+.loading:after {
+  overflow: hidden;
+  display: inline-block;
+  vertical-align: bottom;
+  animation: ellipsis steps(4,end) 900ms infinite;
+  content: "\2026"; /* ascii code for the ellipsis character */
+  width: 0px;
+}
+@keyframes ellipsis {to {width: 1.25em;} }
+
 </style></head><body>
 <div class="bar">
 	<fieldset class="actions"><legend>При выборе файла</legend>
@@ -106,7 +122,9 @@ html {height:100%}
 		во время
 		<span id="time"></span>
 	</legend>
-	<div class="main" id="here"></div>
+	<div class="main" id="here">
+		<div class="loading">Идёт загрузка, ждите</div>
+	</div>
 </fieldset>
 <div class="file shade" id="file_group" style="display:none">
 	<div class="dialog">

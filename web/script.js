@@ -309,8 +309,7 @@ window.onhashchange=()=>{
 }
 
 // INIT
-api('init');
-window.onhashchange();
+api('init').then(()=>window.onhashchange());
 
 
 // resize style
