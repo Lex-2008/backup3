@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/busybox ash
 #
 # Script to show some stats
 
@@ -10,6 +10,12 @@ cd "$BACKUP_ROOT"
 banner() {
 	echo  ===== ===== "$@" ===== =====
 }
+
+if [ "$STATS_HEADERS" = 1 ]; then
+	echo "To: alexey+crontab@shpakovsky.ru"
+	echo "Subject: `hostname` backup-stats"
+	echo
+fi
 
 banner uptime
 uptime
@@ -24,7 +30,7 @@ sh -c "$STATS_DF"
 echo
 banner backup stats
 
-echo " SELECT
+test "$STATS_BROWSERS" = 1 && echo " SELECT
 		dirname AS 'Last backup of browser tabs',
 		filename,
 		max(created) AS 'created',
@@ -73,6 +79,7 @@ if [ "$(echo 'SELECT count(*) FROM bad_new_files' | $SQLITE)" != 0 ]; then
 	echo 'SELECT * FROM bad_new_files' | $SQLITE -header -column
 fi
 
+echo "DROP INDEX IF EXISTS api" | $SQLITE -header -column
 
 test "$STATS_DU" = 1 || exit 0
 
@@ -85,7 +92,7 @@ echo "---- ----- -- ---- ---"
 	(
 		echo .
 		ls data
-	) | xargs -I% echo 'echo "% $(test -e current/% && du -BG -d0 current/% | cut -f1) $(du -BG -d0 data/% | cut -f1)"' | sh
+	) | xargs -I% echo 'echo "% $(test -e current/% && du -h -d0 current/% | cut -f1) $(du -h -d0 data/% | cut -f1)"' | sh
 ) | column -t
 
 # echo

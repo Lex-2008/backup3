@@ -42,6 +42,8 @@ test -z "$HARDLINK_d"     && HARDLINK_d=0 # daily - 7 for 1 week
 test -z "$HARDLINK_h"     && HARDLINK_h=0 # hourly - 24 for 1 day
 
 test -z "$CLEAN_BY_FREQ"  && CLEAN_BY_FREQ="1" # set to 0 to ignore freq when cleaning
+test -z "$STATS_HEADERS"  && STATS_HEADERS="1" # show email headers in stats.sh output
+test -z "$STATS_BROWSERS" && STATS_BROWSERS="1" # show "Last backup of browser tabs" in stats.sh output
 test -z "$STATS_DF"       && STATS_DF="df -h"
 test -z "$STATS_DU"       && STATS_DU="1" # show "Disk usage of each dir" in stats.sh output
 
