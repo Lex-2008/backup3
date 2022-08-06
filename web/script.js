@@ -302,6 +302,32 @@ $('#file_dl').onclick=$('#file_open').onclick=$('#file_show').onclick=render;
 
 $('#tar-btn').onclick=()=>getFile(`tar|${path}|${time}`,path.replace(/.*[\/]/,'')+'.tar');
 
+function startGallery(){
+	var masks='*.jpg *.jpeg *.png *.gif *.webp';
+	// var masks=prompt('Какие файлы показать галереей',masks);
+	// if(!masks) return;
+	masks=masks.split(' ').map(x=>x.trim().toLowerCase().replaceAll('.','\\.').replaceAll('*','.*'))
+		.map(x=>new RegExp(`^${x}$`, 'i'));
+	var elements=[...$('#here').children].filter(x=>x.className=='file' && masks.some(rx=>rx.test(x.innerText)))
+		// TODO: if pass, then not el.href
+		.map(el=>{return {src: el.href, thumb:el.href, download:el.innerText, subHtml:`<p>${el.innerText}</p>`}});
+	window.dynamicGallery = lightGallery($('#gallery-btn'),
+		{dynamic: true, dynamicEl: elements, plugins: [lgThumbnail], enableDrag: false});
+	dynamicGallery.openGallery();
+}
+
+$('#gallery-btn').onclick=()=>{
+	if(window.lightGallery) return startGallery();
+	var el = document.createElement('link');
+	el.rel='stylesheet';
+	el.href='https://cdn.jsdelivr.net/npm/lightgallery@2/css/lightgallery-bundle.min.css';
+	document.head.appendChild(el);
+	el = document.createElement('script');
+	el.src='https://cdn.jsdelivr.net/combine/npm/lightgallery@2/lightgallery.min.js,npm/lightgallery@2/plugins/thumbnail/lg-thumbnail.min.js';
+	el.onload=startGallery;
+	document.body.appendChild(el);
+};
+
 window.onhashchange=()=>{
 	// #dir|dir-date|file|file-date
 	var loc=decodeURIComponent(location.hash.slice(1)).split('|');
