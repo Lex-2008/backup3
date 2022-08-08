@@ -312,7 +312,7 @@ function startGallery(){
 		// TODO: if pass, then not el.href
 		.map(el=>{return {src: el.href, thumb:el.href, download:el.innerText, subHtml:`<p>${el.innerText}</p>`}});
 	window.dynamicGallery = lightGallery($('#gallery-btn'),
-		{dynamic: true, dynamicEl: elements, plugins: [lgThumbnail], enableDrag: false});
+		{dynamic: true, dynamicEl: elements, plugins: [lgThumbnail], enableDrag: false, licenseKey: '21B418D2-B97D4227-90593342-C3FD742D'});
 	dynamicGallery.openGallery();
 }
 
