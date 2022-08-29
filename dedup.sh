@@ -46,11 +46,8 @@ echo "$sql" | $SQLITE | while IFS="$NL" read -r f; do
 echo delete all files
 
 sql="SELECT dirname || filename || '/' || one_created || '$BACKUP_TIME_SEP' || one_deleted FROM dedup;"
-echo "$sql" | $SQLITE | while IFS="$NL" read -r f; do
-		rm -f "$BACKUP_MAIN/$f" 2>/dev/null
-		# echo "$BACKUP_MAIN/$f" X
-	done
-
+cd "$BACKUP_MAIN"
+echo "$sql" | $SQLITE | /usr/bin/xargs -d '\n' rm -f
 
 echo delete all rows
 

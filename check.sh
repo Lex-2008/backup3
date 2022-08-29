@@ -194,12 +194,8 @@ db_order ()
 
 db_dups_created ()
 {
-	if test -n "$FIX"; then
-		operation="DELETE"
-	else
-		operation="SELECT *"
-	fi
-	echo "$operation FROM history
+	ret="dirname || filename || '/' || created || '$BACKUP_TIME_SEP' || deleted"
+	select="FROM history
 		WHERE EXISTS (
 			SELECT *
 			FROM history AS b
@@ -210,12 +206,18 @@ db_dups_created ()
 			AND history.rowid != b.rowid
 			-- check when to delete 'history' row, not the other one
 			AND ( history.freq = 0 AND b.freq != 0
-				OR (
-					NOT (history.freq != 0 AND b.freq = 0)
-					AND history.rowid < b.rowid
+				OR history.rowid < b.rowid
 				)
-			)
-		); " | $SQLITE >check.db_dups_created
+		)"
+	if test -n "$FIX" ; then
+		sql="DELETE $select RETURNING $ret;"
+	else
+		sql="SELECT $ret $select"
+	fi
+	echo "$sql" | $SQLITE | while IFS="$NL" read -r f; do
+			echo rm "$BACKUP_MAIN/$f" >>check.db_dups_created
+			test -n "$FIX" && rm "$BACKUP_MAIN/$f"
+		done
 }
 
 db_dups_freq0 ()
