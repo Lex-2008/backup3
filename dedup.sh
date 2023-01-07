@@ -30,6 +30,12 @@ WINDOW win AS (PARTITION BY inode, dirname, filename);
 DELETE FROM dedup WHERE c<2 OR bad>0 OR (one_created = min_created AND one_deleted = max_deleted);
 END TRANSACTION;" | $SQLITE
 
+echo total dups:
+echo 'SELECT count(*) FROM dedup;' | $SQLITE
+
+echo total groups:
+echo 'SELECT 1 FROM dedup GROUP BY dirname, filename, min_created, max_deleted;' | $SQLITE | wc -l
+
 echo hardlink: one_created~one_deleted '=>' min_created~min_deleted
 
 sql="SELECT dirname || filename || '/' || one_created || '$BACKUP_TIME_SEP' || one_deleted,
