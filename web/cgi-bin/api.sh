@@ -131,7 +131,7 @@ case "$request" in
 		filename="$BACKUP_MAIN/$dir/$file/$date"
 		echo "Content-Disposition: inline; filename=\"$file\""
 		test -f "$filename" || exit 2
-		stat -c 'Content-Length: %s' "$filename"
+		stat -c 'Content-Length: %s' "$filename" || find "$filename" -printf 'Content-Length: %s\n'
 		echo
 		cat "$filename"
 	;;
