@@ -34,12 +34,14 @@ run_rsync()
 	test "$(date -r "$logfile" +"$date_fmt" 2>/dev/null)" = "$(date -d "$BACKUP_TIME" +"$date_fmt")" && return 0
 	# test if we can connect
 	test -d "$from" || $TIMEOUT "$BACKUP_SCAN_TIMEOUT" rsync "$@" $RSYNC_EXTRA "$from" >/dev/null 2>&1 || return 0
+	# detect moved folders
+	$TIMEOUT "$BACKUP_TIMEOUT" rsync -a --itemize-changes --delete --dry-run $rsync_logfile_exclude "$@" $RSYNC_EXTRA "$from" "$BACKUP_CURRENT/$to" 2>&1 | python $BACKUP_BIN/detect.py "$BACKUP_CURRENT/$to" || return 1
 	if test -n "$BACKUP_LOCAL_LOGS"; then
 		# ensure that logfile inode changes
 		mv "$logfile" "$BACKUP_RSYNC_LOGS"
 	fi
 	# sync files
-	$TIMEOUT "$BACKUP_TIMEOUT" rsync -a --itemize-changes --human-readable --stats --delete --partial-dir="$PARTIAL_DIR/$to" $rsync_logfile_exclude "$@" $RSYNC_EXTRA "$from" "$BACKUP_CURRENT/$to" >"$logfile" 2>&1
+	$TIMEOUT "$BACKUP_TIMEOUT" rsync -a --itemize-changes --delete --human-readable --stats --partial-dir="$PARTIAL_DIR/$to" $rsync_logfile_exclude "$@" $RSYNC_EXTRA "$from" "$BACKUP_CURRENT/$to" >"$logfile" 2>&1
 	# add them to DB
 	compare "$to"
 	# create stats file if it doesn't exist
