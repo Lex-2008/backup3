@@ -187,6 +187,8 @@ can choose which version of the file you want to restore:
 
 ![File info dialog](Screenshot_2019-02-03-fileinfo.png)
 
+Demo of Web UI is available at <http://backup3-demo.shpakovsky.ru/>
+
 ### Password protection
 
 Password protection currently implemented via attempt to connect to samba share.
